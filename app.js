@@ -1,5 +1,8 @@
 import { strings } from './locale.js';
-import { domains, levels, types, properties, evidence, stages, relations, passportFields, claimFields } from './taxonomy.js';
+import { domains, levels, types, properties, evidence, stages, relations, passportFields, claimFields, architectureFields,
+  attachmentCategories, attachmentLimits, houseProjectFields, houseProjectGroups } from './taxonomy.js';
+import { domainResearch, foundationalResearch } from './research.js';
+import { concreteStudy, examples, exampleDomain, exampleImagePath, guideCases, houseProjectExample } from './examples.js';
 
 const main = document.querySelector('#main');
 const header = document.querySelector('#header');
@@ -60,13 +63,14 @@ const table = (head, rows, kind) => '<div class="table-scroll" tabindex="0" role
 const crumbs = (...parts) => '<div class="crumbs"><a href="#/">' + tr('home') + '</a>' +
   parts.map(part => '<span aria-hidden="true">/</span>' + part).join('') + '</div>';
 const catalogLink = '<a href="#/catalog">';
-const createURL = domain => '#/new' + (domain ? '?domain=' + encodeURIComponent(domain) : '');
+const createURL = domain => '#/new' + (domain ? '?' + new URLSearchParams({ domain }) : '');
+const exampleDraftURL = key => '#/new?' + new URLSearchParams({ domain: exampleDomain(key), example: key });
 const accountURL = next => '#/login?' + new URLSearchParams({ next });
 const recordLabel = item => text(tr(item.status) + ' · ' + tr(item.visibility));
 const safeLink = (url, label) => '<a href="' + attr(url) + '" rel="noreferrer">' + text(label) + '</a>';
 
 async function api(path, method = 'GET', values, signal) {
-  const response = await fetch('/api/' + path, {
+  const response = await fetch('./api/' + path, {
     method, signal, headers: values === undefined ? {} : { 'Content-Type': 'application/json' },
     body: values === undefined ? undefined : JSON.stringify(values)
   });
@@ -99,24 +103,139 @@ function frame(route) {
     tr(dark ? 'lightTheme' : 'darkTheme') + '</button></nav></div></header>';
   footer.innerHTML = '<footer class="foot"><div class="wrap"><span>Living Things · ' + tr('portal') + '</span><a href="#/guide">' + tr('guide') + '</a></div></footer>';
 }
+const homeExamples = ['house', 'transport', 'factory', 'ship', 'aviation', 'grid',
+  'facade', 'buildings', 'infrastructure', 'robotics', 'other'];
+function exampleCards(keys) {
+  return '<div class="example-gallery">' + keys.map((key, index) => {
+    const example = examples[key];
+    const domain = exampleDomain(key);
+    return '<article class="panel example-card"><a class="example-card-image" href="#/example/' + attr(key) +
+      '" aria-label="' + attr(example.title[language]) + '"><img' + (index >= 6 ? ' loading="lazy"' : '') +
+      ' src="./' + attr(exampleImagePath(example)) + '" alt="' +
+      attr(example.imageAlt[language]) + '"></a><div class="example-card-body">' +
+      '<a class="example-domain" href="' + catalogURL('', { domain }) + '">' + text(domains[domain].label[language]) +
+      '</a><h3><a href="#/example/' + attr(key) + '">' + text(example.title[language]) + '</a></h3><p>' +
+      text(example.summary[language]) + '</p></div></article>';
+  }).join('') + '</div>';
+}
+function exampleGallery(keys, className = '') {
+  return '<section class="tight' + (className ? ' ' + className : '') + '" aria-labelledby="examples-heading"><h2 id="examples-heading">' +
+    tr('exampleGallery') + '</h2>' + exampleCards(keys) + '</section>';
+}
 function home() {
-  const areaList = Object.entries(domains).map(([key, domain]) => '<a class="panel area" href="#/catalog?domain=' + key +
-    '"><h3>' + domain.label[language] + '</h3><p class="muted">' + domain.description[language] + '</p></a>').join('');
-  return layout('<section class="hero"><p class="eyebrow">' + tr('portal') + '</p><h1>Living Things</h1><p>' + tr('tagline') + '</p>' +
-    globalSearch() + '</section><section class="panel intro"><h2>' + tr('intro') + '</h2>' +
+  const videoLanguage = language ? 'en' : 'ru';
+  const introVideo = '<figure class="intro-video"><figcaption>' + tr('introVideo') + '</figcaption>' +
+    '<div class="intro-video-player"><video controls playsinline preload="none" width="1280" height="720" poster="./assets/intro/poster.jpg" aria-label="' +
+    attr(tr('introVideo')) + '" src="./assets/intro/living-things-' + videoLanguage + '.mp4">' +
+    '<track kind="captions" srclang="' + videoLanguage + '" label="' + (language ? 'English' : 'Русский') +
+    '" src="./assets/intro/living-things-' + videoLanguage + '.vtt"></video>' +
+    '<button class="intro-video-play" type="button" data-action="play-intro">' + tr('playIntro') + '</button></div>' +
+    '<p class="intro-video-fallback" hidden>' + safeLink('./assets/intro/living-things-' + videoLanguage + '.mp4', tr('openIntroFile')) + '</p></figure>';
+  return layout('<section class="hero home-hero"><div class="tight"><p class="eyebrow">' + tr('portal') + '</p><h1>Living Things</h1><p>' +
+    tr('tagline') + '</p></div>' + introVideo +
+    '</section>' + exampleGallery(homeExamples, 'home-examples') + globalSearch() + '<section class="panel intro"><h2>' + tr('intro') + '</h2>' +
     [['meaning', 'meaningBrief'], ['scope', 'scopeText'], ['passportPurpose', 'passportText'], ['findTitle', 'findText']].map(([heading, paragraph]) =>
       '<div class="tight"><h3>' + tr(heading) + '</h3><p class="muted">' + tr(paragraph) + '</p></div>').join('') +
-    '<div class="actions">' + button('openGuide', '#/guide', true) + '</div></section><section class="tight"><h2>' + tr('areas') +
-    '</h2><div class="areas">' + areaList + '</div></section>');
+    '<div class="actions">' + button('openGuide', '#/guide', true) + '</div></section>');
 }
-function guide() {
+async function localResearch() {
+  try {
+    return new Set(await api('research', 'GET', undefined, AbortSignal.timeout(4500)));
+  } catch {
+    return new Set();
+  }
+}
+function researchLinks(groups, available, heading = 'researchMore', sources = []) {
+  if (!groups?.length && !sources.length) return '';
+  const sourceURLs = new Set(sources.map(([, url]) => url));
+  const listLinks = links => '<ul class="research-links">' + links.map(([label, url]) =>
+    '<li>' + safeLink(url, label) + '</li>').join('') + '</ul>';
+  const items = (groups || []).map(group => {
+    const related = group.links.map(([label, url]) => [tr(label), Array.isArray(url) ? url[language] : url])
+      .filter(([, url]) => !sourceURLs.has(url));
+    if (!related.length) return '';
+    const links = related
+      .filter(([, url]) => !url.startsWith('/research/') || available.has(url));
+    return '<li class="tight"><h3>' + text(group.title[language]) + '</h3><p class="muted">' +
+      text(group.description[language]) + '</p>' + (links.length ? listLinks(links) :
+        '<p class="muted">' + tr('researchLocalOnly') + '</p>') + '</li>';
+  });
+  if (sources.length) items.unshift('<li class="tight"><h3>' + tr('exampleSources') + '</h3>' + listLinks(sources) + '</li>');
+  return '<details class="research"><summary>' + tr(heading) + '</summary><ul class="research-items">' + items.join('') + '</ul></details>';
+}
+function concreteChart() {
+  const formatMM = new Intl.NumberFormat(language ? 'en-GB' : 'ru', { style: 'unit', unit: 'millimeter', maximumFractionDigits: 2 });
+  return '<figure class="guide-chart tight"><figcaption><strong>' + tr('guideChartTitle') + '</strong><p class="muted">' +
+    tr('guideChartCondition').replace('%d', concreteStudy.immersionDays) + '</p></figcaption>' +
+    concreteStudy.widths.map(({ label, mm }) => '<div class="guide-measure"><div><span>' + text(label[language]) +
+      '</span><strong>' + formatMM.format(mm) + '</strong></div><meter min="0" max="0.5" value="' + mm + '" aria-label="' +
+      attr(label[language]) + '" aria-valuetext="' + attr(formatMM.format(mm)) + '"></meter></div>').join('') +
+    '<p>' + safeLink(concreteStudy.abstract, tr('guideReadStudy')) + '</p></figure>';
+}
+function houseProjectSample() {
+  const flow = '<ol class="example-chain house-project-flow" aria-label="' + tr('houseProjectFlow') + '">' +
+    ['houseDetect', 'houseCheck', 'houseApprove', 'houseRestore', 'houseVerify'].map(key => '<li>' + tr(key) + '</li>').join('') + '</ol>';
+  const sections = houseProjectGroups.map(({ label, fields }) =>
+    '<section class="tight"><h3>' + text(label[language]) + '</h3><dl class="house-project-grid">' +
+    Object.entries(fields).map(([key, [field, prompt]]) => '<div><dt>' + text(field[language]) +
+      '</dt><dd><p class="muted">' + text(prompt[language]) + '</p><p>' + text(houseProjectExample[key][language]) +
+      '</p></dd></div>').join('') + '</dl></section>').join('');
+  return panel('houseProjectExample', '<p>' + tr('houseProjectExampleNote') + '</p>' + flow + sections);
+}
+async function guide(params) {
+  const selection = params.get('object');
+  const key = Object.hasOwn(guideCases, selection) ? selection : 'buildings';
+  const sample = examples[key];
+  const route = guideCases[key];
+  const words = value => text(value[language]);
+  const chooser = '<nav class="panel tight" aria-label="' + tr('guideChoose') + '">' + title('guideChoose') + '<div class="chips">' +
+    Object.entries(guideCases).map(([id, item]) => chip(item.label[language], '#/guide?' + new URLSearchParams({ object: id }),
+      key === id)).join('') + '</div></nav>';
+  const sampleView = '<div class="panel example-intro guide-sample"><div class="tight">' + title('exampleTitle') +
+    '<h3>' + words(sample.title) + '</h3><p>' + words(sample.summary) + '</p>' + descriptionList([
+      [tr('domain'), domains[exampleDomain(key)].label[language]], [tr('type'), name(types, sample.type)],
+      [tr('level'), name(levels, sample.level)], [tr('stage'), name(stages, sample.stage)],
+      [tr('property'), name(properties, sample.property)], [tr('evidence'), sample.evidenceLabel?.[language] || name(evidence, sample.evidence)],
+      [tr('exampleSource'), words(sample.source)]
+    ]) + (key === 'buildings' ? concreteChart() : '') +
+    '<div><a href="#/example/' + attr(key) + '">' + tr('guideFullExample') + '</a></div></div>' +
+    '<figure class="example-image"><img src="./' + attr(exampleImagePath(sample)) + '" alt="' + attr(sample.imageAlt[language]) +
+    '"><figcaption>' + (sample.imageCaption ? words(sample.imageCaption) :
+      tr(sample.sourceImage ? 'exampleSourceImage' : 'exampleIllustration')) + '</figcaption></figure></div>';
+  const limits = tr('guideFileLimits').replace('%f', attachmentLimits.fileMiB).replace('%p', attachmentLimits.passportMiB);
+  const paragraph = value => '<p>' + value + '</p>';
+  const design = sample.design ? descriptionList(Object.entries(sample.design).map(([field, value]) =>
+    [architectureFields[field].label[language], value[language]])) : paragraph(words(route.design));
+  const verification = paragraph(words(sample.procedure)) + (key === 'buildings' ? '' : exampleResultsTable(sample)) +
+    '<p><strong>' + tr(sample.stage === 'concept' ? 'exampleTarget' : 'exampleResult') + '</strong></p>' + paragraph(words(sample.outcome));
+  const steps = [
+    ['guideDefine', paragraph(words(route.scope))],
+    ['guideDraft', paragraph(tr('guideDraftText')) + '<p>' + button('guideStart', exampleDraftURL(key), true) + '</p>'],
+    ['guideClaim', paragraph(tr('guideClaimText')) + paragraph(words(route.claim))],
+    ['guideDesign', paragraph(tr('guideDesignText')) + design],
+    ['guideAttach', paragraph(tr('guideAttachText')) + '<p><strong>' + tr(sample.stage === 'concept' ? 'guidePlannedFiles' : 'guideFileSet') +
+      '</strong></p>' + paragraph(words(sample.documents)) + '<p class="muted">' + limits + '</p>'],
+    ['exampleProcedure', verification],
+    ['guidePublish', paragraph(tr('guidePublishText'))]
+  ].map(([heading, body]) => '<li><h3>' + tr(heading) + '</h3>' + body + '</li>').join('');
+  const available = await localResearch();
+  const sources = (route.references || []).concat(sample.links).filter(([, url]) => !url.startsWith('/research/') || available.has(url));
+  const sourceList = sources.length ? panel('guideSources', '<ul class="compact-list">' + sources.map(([label, url]) =>
+    '<li>' + safeLink(url, label[language]) + '</li>').join('') + '</ul>') : '';
   const sections = [
     ['meaning', ['meaningText']], ['included', ['includedText', 'scopeText']],
     ['passportPurpose', ['passportText', 'evidenceText']], ['related', ['relationText']], ['findTitle', ['findText']]
   ];
-  return layout(crumbs(tr('guide')) + '<h1>' + tr('guide') + '</h1><div class="stack guide">' +
+  return layout(crumbs(tr('guide')) + '<div class="tight"><h1>' + tr('guideHeading') + '</h1><p class="muted">' + tr('guideIntro') + '</p></div>' +
+    chooser + sampleView + (key === 'house' ? houseProjectSample() : '') + panel('guideSteps', '<ol class="guide-steps">' + steps + '</ol>') + sourceList +
+    panel('guideFilesMissing', paragraph(route.missing ? words(route.missing) : tr('guideDataNote'))) +
+    researchLinks(foundationalResearch, available, 'researchBackground') +
+    '<details><summary>' + tr('guideReference') + '</summary><div class="stack guide guide-reference">' +
     sections.map(([heading, paragraphs]) => panel(heading, paragraphs.map(key => '<p>' + tr(key) + '</p>').join(''))).join('') +
-    '</div><div class="actions">' + button('backCatalog', '#/catalog') + button('create', '#/new', true) + '</div>');
+    panel('architecture', '<p>' + tr('architectureHelp') + '</p><dl class="data">' +
+      Object.values(architectureFields).map(field => '<div><dt><strong>' + text(field.label[language]) +
+        '</strong></dt><dd>' + text(field.help[language]) + '</dd></div>').join('') + '</dl>') +
+    '</div></details>');
 }
 function catalogURL(params, change = {}) {
   const query = new URLSearchParams(params);
@@ -135,7 +254,12 @@ async function showCatalog(params) {
   const heading = domain?.label[language] || tr('allAreas');
   const base = catalogURL('', { domain: domain ? domainKey : '' });
   const hasFilters = filterKeys.some(key => params.get(key));
-  const records = await api('passports?' + params);
+  const research = domain && domainResearch[domainKey];
+  const keys = domain ? homeExamples.filter(key => exampleDomain(key) === domainKey) : homeExamples;
+  const [records, available] = await Promise.all([
+    api('passports?' + params, 'GET', undefined, AbortSignal.timeout(4500)).catch(() => null),
+    research ? localResearch() : null
+  ]);
   const compare = '<div class="page-top"><div class="tight"><h2>' + tr('objectCatalog') +
     '</h2><p class="muted">' + tr('compareHint') + '</p></div><button class="secondary" type="button" data-action="compare"' +
     (comparison.size < 2 ? ' disabled' : '') + '>' + tr('compare') + ' <span id="compare-count">(' + comparison.size + ')</span></button></div>';
@@ -151,7 +275,7 @@ async function showCatalog(params) {
     input('person', tr('person'), params.get('person'), 'maxlength="200"') + '<input type="hidden" name="level" value="' +
     attr(params.get('level')) + '"><div class="actions">' + submit('search') + '<a href="' + attr(base) + '">' + tr('reset') + '</a></div></form>';
   const mobileLabel = key => '<span class="mobile-label" aria-hidden="true">' + tr(key) + '</span>';
-  const rows = records.map(item => '<tr role="row"><td role="cell" class="catalog-check"><label class="check"><input type="checkbox" name="compare" value="' + attr(item.id) +
+  const rows = (records || []).map(item => '<tr role="row"><td role="cell" class="catalog-check"><label class="check"><input type="checkbox" name="compare" value="' + attr(item.id) +
     '" aria-label="' + attr(tr('choose') + ' ' + item.title) + '"' + (comparison.has(item.id) ? ' checked' : comparison.size >= 4 ? ' disabled' : '') +
     '></label></td><td role="cell" class="catalog-name"><a href="' + passportURL(item.id) + '">' + text(item.title) + '</a><p class="muted">' +
     text([item.author, item.organization].filter(Boolean).join(' · ')) + '</p></td><td role="cell">' + mobileLabel('type') +
@@ -159,18 +283,16 @@ async function showCatalog(params) {
     text(item.claims.map(claim => name(properties, claim.property)).filter(Boolean).join(', ') || tr('none')) +
     '</td><td role="cell">' + mobileLabel('stage') + '<p>' + text(name(stages, item.stage) || tr('none')) + '</p><p class="muted">' +
     recordLabel(item) + '</p></td><td role="cell">' + mobileLabel('updated') + date(item.updated) + '</td></tr>');
-  const listing = records.length ? table(['<span class="visually-hidden">' + tr('choose') + '</span>',
+  const listing = records === null ? notice('registryUnavailable') : records.length ? table(['<span class="visually-hidden">' + tr('choose') + '</span>',
     ...['title', 'type', 'property', 'stage', 'updated'].map(tr)], rows, 'catalog-table') :
     '<section class="panel empty tight"><h3>' + tr(hasFilters ? 'noResults' : 'noRecords') + '</h3><p>' +
     tr(hasFilters ? 'fewerFilters' : 'emptyContext') + '</p><div class="actions">' +
     (hasFilters ? button('reset', base, true) : button('create', createURL(domainKey), true)) + '</div></section>';
-  const tools = domain ? panel('tools', domain.tools?.length ?
-    '<ul class="compact-list">' + domain.tools.map(tool => '<li>' +
-      safeLink(Array.isArray(tool[2]) ? tool[2][language] : tool[2], tool[language]) + '</li>').join('') + '</ul>' :
-    '<p class="muted">' + tr('noTools') + '</p>') : '';
-  return layout(crumbs(tr('catalog')) + '<div class="page-top"><div class="tight"><h1>' + heading + '</h1><p class="muted">' +
-    (domain?.description[language] || tr('catalogAbout')) + '</p></div>' + button('create', createURL(domainKey)) + '</div>' +
-    classification + '<div class="catalog-layout">' + filterForm + '<section class="tight">' + compare + listing + '</section></div>' + tools);
+  return layout(crumbs(tr('catalog')) + '<div class="tight"><h1>' + heading + '</h1><p class="muted">' +
+    (domain?.description[language] || tr('catalogAbout')) + '</p></div>' +
+    (hasFilters ? '' : exampleGallery(keys)) + researchLinks(research, available) + classification +
+    '<div class="catalog-layout">' + filterForm + '<section class="tight">' + compare + listing +
+    (records?.length ? '<div>' + button('create', createURL(domainKey), true) + '</div>' : '') + '</section></div>');
 }
 async function compareView(params) {
   const ids = (params.get('ids') || '').split(',').slice(0, 4);
@@ -201,6 +323,46 @@ function descriptionList(pairs) {
 function fieldValues(passport, keys) {
   return descriptionList(keys.map(key => [name(passportFields, key), passport[key]]));
 }
+function exampleResultsTable(example) {
+  const words = value => text(Array.isArray(value) ? value[language] : value);
+  return example.rows ? table(example.columnsLabel.map(words), example.rows.map(row =>
+    '<tr><th scope="row">' + words(row[0]) + '</th>' + row.slice(1).map(value => '<td>' + words(value) + '</td>').join('') + '</tr>'),
+    'example-results') : '';
+}
+async function exampleView(key) {
+  if (!Object.hasOwn(examples, key)) throw new Error('missing');
+  const example = examples[key];
+  const domain = exampleDomain(key);
+  const words = value => text(Array.isArray(value) ? value[language] : value);
+  const available = await localResearch();
+  const domainLink = '<a href="' + catalogURL('', { domain }) + '">' + words(domains[domain].label) + '</a>';
+  const details = descriptionList([
+    [tr('type'), name(types, example.type)], [tr('level'), name(levels, example.level)],
+    [tr('stage'), name(stages, example.stage)], [tr('property'), name(properties, example.property)],
+    [tr('evidence'), example.evidenceLabel?.[language] || name(evidence, example.evidence)],
+    [tr('exampleSource'), example.source[language]]
+  ]);
+  const image = '<figure class="example-image"><img src="./' + attr(exampleImagePath(example)) + '" alt="' +
+    words(example.imageAlt) + '"><figcaption>' + (example.imageCaption ? words(example.imageCaption) :
+      tr(example.sourceImage ? 'exampleSourceImage' : 'exampleIllustration')) + '</figcaption></figure>';
+  const relationsBlock = example.related ? '<ol class="example-chain">' +
+    example.related.map(item => '<li>' + words(item) + '</li>').join('') + '</ol>' : '';
+  const design = example.design ? panel('architecture', descriptionList(Object.entries(example.design).map(([field, value]) =>
+    [architectureFields[field].label[language], value[language]]))) : '';
+  const sourceLinks = example.links.filter(([, url]) => !url.startsWith('/research/') || available.has(url))
+    .map(([label, url]) => [label[language], url]);
+  const relatedResearch = (domainResearch[domain] || []).filter(group => (group.examples || [domain]).includes(key));
+  return layout(crumbs(catalogLink + tr('catalog') + '</a>', domainLink, tr('exampleTitle')) +
+    '<div class="panel example-intro"><div class="tight"><p class="eyebrow">' + tr('exampleTitle') + '</p><h1>' + words(example.title) +
+    '</h1><p class="muted">' + words(example.summary) + '</p>' + details + '</div>' + image + '</div>' +
+    researchLinks(relatedResearch, available, 'researchMore', sourceLinks) + (key === 'house' ? houseProjectSample() : '') + relationsBlock + design +
+    panel('exampleData', '<p>' + words(example.documents) + '</p>') +
+    panel('exampleProcedure', '<p>' + words(example.procedure) + '</p>') +
+    panel(example.stage === 'concept' ? 'exampleTarget' : 'exampleResult', exampleResultsTable(example) + '<p>' + words(example.outcome) + '</p>') +
+    panel('exampleStorageTitle', '<p>' + tr('exampleStorage') + '</p><div class="actions">' +
+      button('exampleOwn', exampleDraftURL(key)) +
+      (example.columns ? '<a href="./examples/' + attr(key) + '.csv" download>' + tr('exampleTemplate') + '</a>' : '') + '</div>'));
+}
 function passportContent(passport) {
   const identity = [
     [tr('id'), passport.id], [tr('version'), passport.version], [tr('updated'), date(passport.updated)],
@@ -212,11 +374,23 @@ function passportContent(passport) {
   const claims = passport.claims.map(claim => '<article class="panel subtle tight"><h3>' + text(name(properties, claim.property) || tr('claim')) +
     '</h3>' + descriptionList([[tr('evidence'), name(evidence, claim.evidence)],
       ...Object.keys(claimFields).map(key => [name(claimFields, key), claim[key]])]) + '</article>').join('');
-  const specific = Object.entries(passport.details).filter(([key, fields]) => domains[key] && Object.values(fields).some(Boolean))
-    .map(([key, fields]) => '<div class="tight"><h3>' + domains[key].label[language] + '</h3>' +
-      descriptionList(Object.entries(fields).map(([field, value]) => [domains[key].fields[field]?.[language], value])) + '</div>').join('');
+  const specific = Object.entries(passport.details).map(([key, fields]) => {
+    if (!Object.hasOwn(domains, key)) return '';
+    const values = Object.entries(fields).filter(([field, value]) => value && !Object.hasOwn(houseProjectFields, field));
+    return values.length ? '<div class="tight"><h3>' + domains[key].label[language] + '</h3>' +
+      descriptionList(values.map(([field, value]) => [domains[key].fields[field]?.[language], value])) + '</div>' : '';
+  }).join('');
+  const houseFields = passport.details.buildings || {};
+  const houseProject = houseProjectGroups.map(({ label, fields }) => {
+    const values = Object.entries(fields).filter(([key]) => houseFields[key]);
+    return values.length ? '<div class="tight"><h3>' + text(label[language]) + '</h3>' +
+      descriptionList(values.map(([key, [field]]) => [field[language], houseFields[key]])) + '</div>' : '';
+  }).join('');
   return panel('identity', (passport.description ? '<p class="preline">' + text(passport.description) + '</p>' : '') + descriptionList(identity)) +
-    panel('living', claims || '<p class="muted">' + tr('noClaims') + '</p>') + panel('engineering', fieldValues(passport, engineeringKeys) + specific) +
+    panel('living', claims || '<p class="muted">' + tr('noClaims') + '</p>') +
+    (Object.keys(architectureFields).some(key => passport[key]) ? panel('architecture', fieldValues(passport, Object.keys(architectureFields))) : '') +
+    panel('engineering', fieldValues(passport, engineeringKeys) + specific) +
+    (houseProject ? panel('houseProject', houseProject) : '') +
     panel('origins', fieldValues(passport, originKeys));
 }
 async function passportView(id, version) {
@@ -234,12 +408,20 @@ async function passportView(id, version) {
   const related = data.related.map(item => '<li><a href="' + passportURL(item.target) + '">' + text(item.title) + '</a> · ' +
     text((item.incoming ? tr('inbound') + ' · ' : '') + name(relations, item.type)) +
     (item.note ? '<p class="muted preline">' + text(item.note) + '</p>' : '') + '</li>');
-  const files = [...links, ...data.files.map(file => '<li><a href="/api/' + endpoint + '/files/' + attr(file.id) + '" download>' +
-    text(file.name) + '</a> · ' + new Intl.NumberFormat(language ? 'en' : 'ru', {
+  const fileURL = file => '/api/' + endpoint + '/files/' + encodeURIComponent(file.id);
+  const files = [...links, ...data.files.map(file => '<li><a href="' + fileURL(file) + '" download>' +
+    text(file.name) + '</a> · ' + text(name(attachmentCategories, file.category)) +
+    (file.revision ? ' · ' + text(file.revision) : '') + ' · ' + new Intl.NumberFormat(language ? 'en' : 'ru', {
       style: 'unit', unit: file.size < 1000 ? 'byte' : 'kilobyte', maximumFractionDigits: 1
     }).format(file.size < 1000 ? file.size : file.size / 1000) + '</li>')];
+  const photo = data.files.find(file => file.category === 'image' && file.preview);
+  const cover = photo ? '<figure class="passport-photo"><img src="' + fileURL(photo) + '?preview=1" alt="' + attr(photo.name) +
+    '"><figcaption>' + text(photo.name) + '</figcaption></figure>' : '';
   const upload = passport.editable ? '<form class="tight" data-form="file" data-id="' + attr(id) + '">' +
-    input('file', tr('file'), '', 'type="file" required') + formStatus + '<div>' + submit('upload', true) + '</div></form>' : '';
+    '<p class="muted">' + tr('fileGuide') + '</p><div class="grid-2">' + select('category', tr('fileCategory'), attachmentCategories, 'other') +
+    input('revision', tr('fileRevision'), '', 'maxlength="100"') + '</div>' +
+    input('file', tr('file') + ' (≤ ' + attachmentLimits.fileMiB + (language ? ' MiB)' : ' МиБ)'), '', 'type="file" required') +
+    formStatus + '<div>' + submit('upload', true) + '</div></form>' : '';
   const versions = data.versions.map(item => '<li><a href="' + passportURL(id) + '/version/' + item.version + '">' +
     tr('version') + ' ' + item.version + '</a> · ' + date(item.updated) +
     (item.changes ? '<p class="muted preline">' + text(item.changes) + '</p>' : '') + '</li>');
@@ -248,7 +430,7 @@ async function passportView(id, version) {
   const discuss = user ? '<form class="tight" data-form="comment" data-id="' + attr(id) + '">' +
     area('message', tr('message'), '', 'required') + formStatus + '<div>' + submit('send', true) + '</div></form>' :
     '<p><a href="' + attr(accountURL(passportURL(id))) + '">' + tr('signIn') + '</a></p>';
-  return layout(location + heading + content +
+  return layout(location + heading + cover + content +
     panel('related', related.length ? '<ul class="compact-list">' + related.join('') + '</ul>' : '<p class="muted">' + tr('noRelated') + '</p>') +
     panel('files', (files.length ? '<ul class="compact-list">' + files.join('') + '</ul>' : '<p class="muted">' + tr('noFiles') + '</p>') + upload) +
     panel('history', '<ul class="compact-list">' + versions.join('') + '</ul>') +
@@ -256,6 +438,14 @@ async function passportView(id, version) {
 }
 
 const access = { public: strings.public, private: strings.private };
+function houseProjectEditor(details = {}) {
+  return '<div class="stack" data-house-project hidden><p>' + tr('houseProjectEditorNote') + ' ' +
+    '<a href="#/guide?object=house" rel="noopener" target="_blank">' + tr('houseOpenSample') + '</a></p>' +
+    houseProjectGroups.map(({ label, fields }) => '<fieldset class="grid-2"><legend>' + text(label[language]) + '</legend>' +
+      Object.entries(fields).map(([key, [field, prompt]]) => '<div class="architecture-field">' +
+        area('detail.buildings.' + key, field[language], details[key], 'aria-describedby="house-' + key + '"') +
+        '<p class="muted" id="house-' + key + '">' + text(prompt[language]) + '</p></div>').join('') + '</fieldset>').join('') + '</div>';
+}
 function editSections(passport, candidates) {
   const chosen = passport.domains || [];
   const typesBlock = ['type', 'level', 'stage'].map(key => select(key, tr(key), taxonomy[key], passport[key])).join('');
@@ -269,16 +459,21 @@ function editSections(passport, candidates) {
     '</div><fieldset class="tight"><legend>' + tr('domain') + '</legend><div class="grid-2">' + domainEditor + '</div></fieldset>') +
     panel('living', '<p class="muted">' + tr('claimHelp') + '</p><div class="tight" id="claim-list">' +
       (passport.claims || [{}]).map(claimEditor).join('') + '</div><div>' + customButton('addClaim', 'add-claim') + '</div>') +
+    panel('architecture', '<p class="muted">' + tr('architectureHelp') + '</p><div class="grid-2">' +
+      Object.entries(architectureFields).map(([key, field]) => '<div class="architecture-field">' +
+        area(key, field.label[language], passport[key], 'aria-describedby="' + key + '-help"') +
+        '<p class="muted" id="' + key + '-help">' + text(field.help[language]) + '</p></div>').join('') + '</div>') +
     panel('engineering', '<div class="grid-2">' + engineeringKeys.map(key => passportArea(passport, key)).join('') + '</div>') +
     panel('domainFields', '<p class="muted">' + tr('specificHelp') + '</p>' + Object.entries(domains).map(([key, domain]) =>
-      '<fieldset data-domain-fields="' + key + '"' + (chosen.includes(key) ? '' : ' hidden disabled') + '><legend>' + domain.label[language] +
-      '</legend><div class="grid-2">' + Object.keys(domain.fields).map(field =>
-        area('detail.' + key + '.' + field, name(domain.fields, field), passport.details?.[key]?.[field])).join('') + '</div></fieldset>').join('')) +
+      '<fieldset class="tight" data-domain-fields="' + key + '"' + (chosen.includes(key) ? '' : ' hidden disabled') + '><legend>' + domain.label[language] +
+      '</legend><div class="grid-2">' + Object.keys(domain.fields).filter(field => !Object.hasOwn(houseProjectFields, field)).map(field =>
+        area('detail.' + key + '.' + field, name(domain.fields, field), passport.details?.[key]?.[field])).join('') + '</div>' +
+      (key === 'buildings' ? houseProjectEditor(passport.details?.buildings) : '') + '</fieldset>').join('')) +
     panel('origins', '<div class="grid-2">' + [...originKeys, 'changes'].map(key => passportArea(passport, key)).join('') + '</div>') +
     panel('related', '<div id="relation-list" class="tight">' + (passport.relations || []).map(item => relationEditor(item, candidates)).join('') +
       '</div>' + (candidates.length ? '<div>' + customButton('addRelation', 'add-relation') + '</div>' :
         '<p class="muted">' + tr('relationHelp') + '</p>')) +
-    panel('files', '<div id="link-list" class="tight">' + (passport.links || []).map(linkEditor).join('') +
+    panel('files', '<p class="muted">' + tr('exampleStorage') + '</p><div id="link-list" class="tight">' + (passport.links || []).map(linkEditor).join('') +
       '</div><div>' + customButton('addLink', 'add-link') + '</div>');
 }
 function claimEditor(item = {}) {
@@ -306,6 +501,9 @@ function syncEditor(form) {
   for (const fieldset of form.querySelectorAll('[data-domain-fields]')) {
     fieldset.hidden = fieldset.disabled = !domainKeys.includes(fieldset.dataset.domainFields);
   }
+  const houseProject = form.querySelector('[data-house-project]');
+  houseProject.hidden = current.get('level') !== 'whole' &&
+    ![...houseProject.querySelectorAll('textarea')].some(field => field.value);
   for (const row of form.querySelectorAll('[data-row="claim"]')) {
     const level = current.get('level');
     const stage = current.get('stage');
@@ -338,7 +536,12 @@ function editorPage(passport, candidates) {
 async function openEditor(id, params, routeToken) {
   if (!user) return authPage('login', new URLSearchParams({ next: location.hash }));
   const reused = editorState?.route === location.hash && editorState.passport;
-  const initial = { domains: Object.hasOwn(domains, params.get('domain')) ? [params.get('domain')] : [] };
+  const domain = params.get('domain');
+  const initial = { domains: Object.hasOwn(domains, domain) ? [domain] : [] };
+  const exampleKey = params.get('example') === '1' ? domain : params.get('example');
+  if (Object.hasOwn(examples, exampleKey) && exampleDomain(exampleKey) === domain) {
+    Object.assign(initial, { type: examples[exampleKey].type, level: examples[exampleKey].level });
+  }
   const [loaded, allRecords] = await Promise.all([id ? api('passports/' + encodeURIComponent(id)) : null, api('passports')]);
   if (id && !loaded.passport.editable) throw new Error('forbidden');
   const candidates = allRecords.filter(item => item.id !== id);
@@ -374,13 +577,15 @@ async function render({ focus = false, keepScroll = false } = {}) {
   document.documentElement.lang = language ? 'en' : 'ru';
   frame(route);
   const previousScroll = window.scrollY;
+  const researchOpen = keepScroll && main.querySelector('details.research')?.open;
   main.setAttribute('aria-busy', 'true');
   let result;
   try {
     switch (route) {
       case '': result = home(); break;
-      case 'guide': result = guide(); break;
+      case 'guide': result = await guide(params); break;
       case 'catalog': result = await showCatalog(params); break;
+      case 'example': result = await exampleView(id); break;
       case 'compare': result = await compareView(params); break;
       case 'passport': result = await passportView(id, action === 'version' ? version : undefined); break;
       case 'edit':
@@ -394,6 +599,8 @@ async function render({ focus = false, keepScroll = false } = {}) {
   }
   if (routeToken !== generation) return;
   main.innerHTML = result;
+  const research = main.querySelector('details.research');
+  if (research && researchOpen) research.open = true;
   main.removeAttribute('aria-busy');
   const alert = flash;
   flash = '';
@@ -430,13 +637,16 @@ function editorData(form, status) {
     domains: data.getAll('domains'), details, claims, relations: readRows('relation'), links: readRows('link')
   };
 }
-function encodeFile(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(',')[1]);
-    reader.onerror = () => reject(new Error('fileInvalid'));
-    reader.readAsDataURL(file);
+async function uploadAttachment(id, file, data) {
+  if (!file?.size || file.size > attachmentLimits.fileMiB * 1024 * 1024) throw new Error('fileInvalid');
+  const query = new URLSearchParams({ name: file.name, category: data.get('category'), revision: data.get('revision') });
+  const response = await fetch('/api/passports/' + encodeURIComponent(id) + '/files?' + query, {
+    method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file
   });
+  if (!response.ok) {
+    const result = await response.json();
+    throw new Error(result.error || 'failed');
+  }
 }
 async function transact(form, task) {
   const buttons = [...form.querySelectorAll('button:not([disabled])')];
@@ -480,13 +690,11 @@ document.addEventListener('submit', event => {
   }
   if (kind === 'comment' || kind === 'file') {
     transact(form, async () => {
-      let payload = { message: data.get('message') };
       if (kind === 'file') {
-        const file = data.get('file');
-        if (!file?.size || file.size > 5 * 1024 * 1024) throw new Error('fileInvalid');
-        payload = { name: file.name, content: await encodeFile(file) };
+        await uploadAttachment(id, data.get('file'), data);
+      } else {
+        await api('passports/' + encodeURIComponent(id) + '/comments', 'POST', { message: data.get('message') });
       }
-      await api('passports/' + encodeURIComponent(id) + (kind === 'file' ? '/files' : '/comments'), 'POST', payload);
       flash = kind === 'file' ? 'uploaded' : 'sent';
       await render({ keepScroll: true });
     });
@@ -516,6 +724,17 @@ document.addEventListener('click', async event => {
   const control = event.target.closest('[data-action]');
   if (!control) return;
   const action = control.dataset.action;
+  if (action === 'play-intro') {
+    const figure = control.closest('figure');
+    const video = figure.querySelector('video');
+    control.hidden = true;
+    try {
+      await video.play();
+      video.focus();
+    } catch {
+      figure.querySelector('.intro-video-fallback').hidden = false;
+    }
+  }
   if (action === 'skip') {
     event.preventDefault();
     main.focus();
@@ -568,11 +787,11 @@ document.addEventListener('click', async event => {
 });
 window.addEventListener('hashchange', () => render({ focus: true }));
 applyTheme();
-if (location.protocol !== 'file:' && ['/', '/index.html'].includes(location.pathname)) {
+if (location.protocol !== 'file:') {
   try {
     user = (await api('session', 'GET', undefined, AbortSignal.timeout(4500))).user;
   } catch {
-    flash = 'failed';
+    // Public examples work without a registry connection.
   }
   await render();
 }
