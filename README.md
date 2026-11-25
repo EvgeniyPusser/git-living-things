@@ -1,66 +1,36 @@
-# Egregor Cloud MVP
+# Living Things
 
-Static prototype for the first public nucleus of Egregor Cloud.
+Двуязычный научно-технический портал для описания технических систем и компонентов по их свойствам Living Things.
 
-## What is included
+## Запуск
 
-- `index.html` - landing page with manifesto, seed library, lab, and join flow
-- `styles.css` - visual language for the first public portal
-- `models.js` - seed data based on the current project folders
-- `app.js` - client-side filtering for the model library
-- `supabase.config.js` - optional cloud connection settings
+Требуется Node.js 24 или новее. Установка пакетов не нужна.
 
-## Local launch
-
-Run:
-
-```bash
-npm run dev
+```sh
+npm start
 ```
 
-Then open `http://127.0.0.1:4173`.
+Откройте http://127.0.0.1:4173. Чистая база создаётся автоматически в `var/portal.sqlite`. Сервер обслуживает интерфейс и API с одного адреса. Все клиенты этого сервера работают с одной базой в SQLite.
 
-## Why static first
+## Хранение и доступ
 
-This version is intentionally simple:
+- Регистрация создаёт аккаунт в базе. Пароли хранятся в виде хешей scrypt, сессии используют HttpOnly cookie.
+- Черновики и закрытые паспорта доступны владельцу аккаунта. Опубликованный паспорт с публичным доступом доступен всем посетителям. Изменения и загрузка вложений доступны владельцу, комментарии могут оставлять вошедшие пользователи с доступом к паспорту.
+- Права проверяются сервером и распространяются на каталог, сравнение, связанные объекты, вложения и историю версий. В публичной истории видны версии, сохранённые с публичным доступом и статусом публикации.
+- Вложения хранятся в той же базе. Допускается до 5 МиБ на файл и до 25 МиБ на паспорт. Внешние ссылки должны использовать HTTP или HTTPS.
+- Справочники областей, типов, уровней, стадий и отношений находятся в `taxonomy.js`. Для новой области добавьте название, описание, поля и, при необходимости, ссылки на инструменты.
 
-- zero backend required for the first demo
-- cheap to host on almost any provider
-- easy to move later to Cloudflare Pages, Hostinger, or a framework app
-- gives a public face for outreach before the full cloud exists
+## Развёртывание
 
-## Auto deploy from GitHub
+Для общего доступа нужен хост с Node.js 24+, HTTPS и постоянным диском. Запустите один экземпляр приложения за HTTPS-прокси. Параметры процесса:
 
-Recommended hosting: `Cloudflare Pages`.
+| Переменная | Назначение |
+| --- | --- |
+| `HOST` | Адрес прослушивания, по умолчанию `127.0.0.1` |
+| `PORT` | Порт приложения, по умолчанию `4173` |
+| `LIVING_THINGS_ORIGIN` | Внешний HTTPS-адрес без завершающей косой черты, например `https://portal.example.org`. Включает Secure для cookie и используется при проверке источника запросов на запись. |
+| `LIVING_THINGS_DB` | Путь к файлу SQLite на постоянном диске |
 
-Use these settings:
+Настройте резервное копирование через механизм снимков SQLite или копируйте базу после остановки процесса. Статический деплой, например GitHub Pages, не запускает API.
 
-- Repository: `EvgeniyPusser/ergregor-cloud`
-- Branch: `main`
-- Framework preset: `None`
-- Build command: leave empty
-- Output directory: `.`
-
-After that, every push to `main` deploys automatically.
-
-## Recommended next steps
-
-1. Add real images and links to source documents.
-2. Keep filling Supabase with real models and thoughts.
-3. Add a model detail page for each seed object.
-4. Add roles, access levels, and contribution history.
-5. Introduce payments only after trust and attention exist.
-
-## Thermal calculator
-
-Choose **Thermal calculator** inside Buildings (or the buttons on Heat & tests). It opens the live calculator published by GitHub Pages from `living-things-sim`:
-- Russian: https://evgeniypusser.github.io/living-things-sim/calc/stend.html
-- English: https://evgeniypusser.github.io/living-things-sim/calc/bench.html
-
-Source: https://github.com/EvgeniyPusser/living-things-sim (`calc/`). Every push to its `main` branch updates the published calculator within a minute or two, so the portal always shows the latest one. Needs an internet connection. The research project's Python experiments are not run by the website.
-
-## Living Building Assembly (3D)
-
-Choose **Living Building** inside Buildings. It opens the live version published by GitHub Pages: https://evgeniypusser.github.io/living-building-assembly/
-
-Source: https://github.com/EvgeniyPusser/living-building-assembly. Every push to its `main` branch updates the published version within a minute or two, so the portal always shows the latest one. Needs an internet connection.
+Аккаунты по умолчанию создаются сразу. Для подтверждения адресов или восстановления паролей понадобится отдельная почтовая интеграция. Старые страницы прототипа хранятся в репозитории. Новый портал не импортирует их демонстрационные записи и не использует старую конфигурацию Supabase. В разделе зданий доступны ссылки на опубликованные инструменты сборки и теплотехнического расчёта.

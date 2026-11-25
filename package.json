@@ -1,8 +1,10 @@
 {
-  "name": "egregor-cloud",
+  "name": "living-things",
   "private": true,
   "version": "0.1.0",
-  "description": "Static prototype for the first public nucleus of Egregor Cloud.",
+  "description": "Living Things technical registry.",
+  "type": "module",
+  "engines": { "node": ">=24" },
   "scripts": {
     "dev": "node scripts/dev-server.mjs",
     "start": "node scripts/dev-server.mjs",
