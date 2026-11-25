@@ -93,10 +93,5 @@ export const strings = {
   fileQuota: ['Достигнут предел 25 МБ на паспорт.', 'The passport’s 25 MB file limit has been reached.'],
   large: ['Превышен максимальный размер запроса.', 'The request exceeds the maximum size.'],
   removeEntry: ['Удалить строку', 'Remove row'],
-  scrollTable: ['Таблица с горизонтальной прокруткой', 'Horizontally scrollable table'],
-  lineage: ['Происхождение и потомки', 'Lineage and descendants'], forkOf: ['Форк от', 'Fork of'],
-  originalObject: ['Это исходный объект, не форк.', 'This is an original object, not a fork.'],
-  descendants: ['Потомки', 'Descendants'], noDescendants: ['Потомков пока нет.', 'No descendants yet.'],
-  forkTitle: ['Название объекта-потомка', 'Name of the descendant'], fork: ['Сделать форк', 'Fork'],
-  forked: ['Форк создан как закрытый черновик. Отредактируйте и опубликуйте его.', 'Fork created as a private draft. Edit and publish it.']
+  scrollTable: ['Таблица с горизонтальной прокруткой', 'Horizontally scrollable table']
 };

@@ -20,8 +20,6 @@ db.exec(
   'CREATE TABLE IF NOT EXISTS versions (passport TEXT REFERENCES passports(id), version INTEGER, updated TEXT, visibility TEXT, status TEXT, data TEXT, PRIMARY KEY(passport,version));' +
   'CREATE TABLE IF NOT EXISTS files (id TEXT PRIMARY KEY, passport TEXT REFERENCES passports(id), name TEXT, content BLOB);' +
   'CREATE TABLE IF NOT EXISTS comments (id TEXT PRIMARY KEY, passport TEXT REFERENCES passports(id), author TEXT REFERENCES accounts(id), created TEXT, message TEXT);' +
-  'CREATE TABLE IF NOT EXISTS forks (child TEXT PRIMARY KEY REFERENCES passports(id), parent TEXT REFERENCES passports(id), parent_version INTEGER, created TEXT);' +
-  'CREATE INDEX IF NOT EXISTS forks_parent ON forks(parent);' +
   'CREATE INDEX IF NOT EXISTS passports_owner ON passports(owner);' +
   'CREATE INDEX IF NOT EXISTS files_passport ON files(passport);' +
   'CREATE INDEX IF NOT EXISTS comments_passport ON comments(passport);'
@@ -227,30 +225,6 @@ function savePassport(input, user, existing) {
   }
   return id;
 }
-// Форк: копия паспорта, принадлежащая новому владельцу, со связью «Происходит от» на родителя.
-function forkPassport(row, user, input) {
-  const source = JSON.parse(row.data);
-  const copied = source.relations.filter(link => readable(record(link.target), user) && !(link.type === 'derived' && link.target === row.id));
-  const id = savePassport({
-    ...source,
-    title: clean(input.title, 200) || source.title,
-    changes: 'Форк / Fork: ' + source.title + ' · v' + row.version,
-    relations: [...copied, { type: 'derived', target: row.id, note: 'Форк / Fork' }],
-    status: 'draft', visibility: 'private'
-  }, user);
-  run('INSERT INTO forks VALUES (?,?,?,?)', id, row.id, row.version, now());
-  return id;
-}
-// Родитель и дерево потомков, видимые пользователю.
-function lineage(id, user) {
-  const link = get('SELECT parent,parent_version FROM forks WHERE child=?', id);
-  const parentRow = link && record(link.parent);
-  const parent = readable(parentRow, user) ? { id: parentRow.id, title: JSON.parse(parentRow.data).title, version: link.parent_version } : null;
-  const children = (key, depth) => depth > 20 ? [] : all('SELECT child FROM forks WHERE parent=? ORDER BY created', key)
-    .map(item => record(item.child)).filter(child => readable(child, user))
-    .map(child => ({ id: child.id, title: JSON.parse(child.data).title, children: children(child.id, depth + 1) }));
-  return { parent, children: children(id, 0) };
-}
 function detail(row, user) {
   const passport = flatten(row, user);
   passport.relations = filteredRelations(passport, user);
@@ -264,7 +238,6 @@ function detail(row, user) {
   return {
     passport,
     related: [...outgoing, ...incoming],
-    lineage: lineage(row.id, user),
     files: all('SELECT id,name,length(content) AS size FROM files WHERE passport=? ORDER BY rowid', row.id),
     comments: all('SELECT c.created,c.message,a.name FROM comments c JOIN accounts a ON c.author=a.id WHERE c.passport=? ORDER BY c.rowid', row.id),
     versions: all('SELECT version,updated,visibility,status,data FROM versions WHERE passport=? ORDER BY version DESC', row.id)
@@ -318,7 +291,7 @@ async function api(req, res, url) {
   if (method === 'POST' && path === '/api/passports') {
     return json(res, { id: savePassport(await body(req), user) }, 201);
   }
-  const match = /^\/api\/passports\/([a-f0-9-]{36})(?:\/(files|comments|versions|fork)(?:\/([a-f0-9-]+))?)?$/.exec(path);
+  const match = /^\/api\/passports\/([a-f0-9-]{36})(?:\/(files|comments|versions)(?:\/([a-f0-9-]+))?)?$/.exec(path);
   requireValue(match, 404, 'missing');
   const [, id, section, itemId] = match;
   const row = readRecord(id, user);
@@ -346,9 +319,6 @@ async function api(req, res, url) {
     run('INSERT INTO comments VALUES (?,?,?,?,?)', randomUUID(), id, user.id, now(), message);
     return json(res, { saved: true }, 201);
   }
-  if (method === 'POST' && section === 'fork' && !itemId) {
-    return json(res, { id: forkPassport(row, user, await body(req)) }, 201);
-  }
   requireOwner(row, user);
   if (method === 'PUT' && !section) return json(res, { id: savePassport(await body(req), user, row) });
   if (method === 'POST' && section === 'files' && !itemId) {
@@ -368,6 +338,7 @@ async function api(req, res, url) {
 const staticFiles = {
   '/': ['index.html', 'text/html'], '/index.html': ['index.html', 'text/html'],
   '/styles.css': ['styles.css', 'text/css'], '/app.js': ['app.js', 'text/javascript'],
+  '/scripts/open-local.js': ['scripts/open-local.js', 'text/javascript'],
   '/taxonomy.js': ['taxonomy.js', 'text/javascript'], '/locale.js': ['locale.js', 'text/javascript']
 };
 const server = createServer(async (req, res) => {

@@ -248,19 +248,8 @@ async function passportView(id, version) {
   const discuss = user ? '<form class="tight" data-form="comment" data-id="' + attr(id) + '">' +
     area('message', tr('message'), '', 'required') + formStatus + '<div>' + submit('send', true) + '</div></form>' :
     '<p><a href="' + attr(accountURL(passportURL(id))) + '">' + tr('signIn') + '</a></p>';
-  const tree = items => '<ul class="compact-list lineage">' + items.map(item => '<li><a href="' + passportURL(item.id) + '">' +
-    text(item.title) + '</a>' + (item.children.length ? tree(item.children) : '') + '</li>').join('') + '</ul>';
-  const lineage = (data.lineage.parent ? '<p>' + tr('forkOf') + ' <a href="' + passportURL(data.lineage.parent.id) + '">' +
-    text(data.lineage.parent.title) + '</a> · ' + tr('version') + ' ' + data.lineage.parent.version + '</p>' :
-    '<p class="muted">' + tr('originalObject') + '</p>') + '<h3>' + tr('descendants') + '</h3>' +
-    (data.lineage.children.length ? tree(data.lineage.children) : '<p class="muted">' + tr('noDescendants') + '</p>') +
-    (user ? '<form class="tight" data-form="fork" data-id="' + attr(id) + '">' +
-      input('title', tr('forkTitle'), passport.title + ' (fork)', 'required maxlength="200"') + formStatus +
-      '<div>' + submit('fork', true) + '</div></form>' :
-      '<p><a href="' + attr(accountURL(passportURL(id))) + '">' + tr('signIn') + '</a></p>');
   return layout(location + heading + content +
     panel('related', related.length ? '<ul class="compact-list">' + related.join('') + '</ul>' : '<p class="muted">' + tr('noRelated') + '</p>') +
-    panel('lineage', lineage) +
     panel('files', (files.length ? '<ul class="compact-list">' + files.join('') + '</ul>' : '<p class="muted">' + tr('noFiles') + '</p>') + upload) +
     panel('history', '<ul class="compact-list">' + versions.join('') + '</ul>') +
     panel('discussions', (comments.join('') || '<p class="muted">' + tr('noComments') + '</p>') + discuss));
@@ -489,13 +478,6 @@ document.addEventListener('submit', event => {
       routeTo(passportURL(result.id));
     });
   }
-  if (kind === 'fork') {
-    transact(form, async () => {
-      const result = await api('passports/' + encodeURIComponent(id) + '/fork', 'POST', { title: data.get('title') });
-      flash = 'forked';
-      routeTo(passportURL(result.id));
-    });
-  }
   if (kind === 'comment' || kind === 'file') {
     transact(form, async () => {
       let payload = { message: data.get('message') };
@@ -589,8 +571,8 @@ applyTheme();
 if (location.protocol !== 'file:' && ['/', '/index.html'].includes(location.pathname)) {
   try {
     user = (await api('session', 'GET', undefined, AbortSignal.timeout(4500))).user;
-    await render();
   } catch {
-    // Keep the launch instructions visible in static previews.
+    flash = 'failed';
   }
+  await render();
 }
