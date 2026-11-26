@@ -36,10 +36,10 @@ npm start
 
 ### Публичный сайт на GitHub Pages
 
-Версия на `https://evgeniypusser.github.io/git-living-things/` использует Supabase Auth, Data API и приватный бакет вложений. Локальный сервер использует SQLite. Публичный клиент Supabase подключён в `supabase-backend.js`.
+Версия на `https://portal.living-things.org/` (адрес `https://evgeniypusser.github.io/git-living-things/` перенаправляет туда) использует Supabase Auth, Data API и приватный бакет вложений. Локальный сервер использует SQLite. Публичный клиент Supabase подключён в `supabase-backend.js`.
 
 1. В проекте Supabase включите Data API. Миграция в `supabase/migrations/` создаёт таблицы и хранилище с правилами доступа. Если включён **Deploy to production** для `main`, GitHub-интеграция применит миграцию при отправке ветки.
-2. В **Authentication → URL Configuration** установите **Site URL** на `https://evgeniypusser.github.io/git-living-things/`. В разрешённые редиректы добавьте `https://evgeniypusser.github.io/git-living-things/**` для возврата после подтверждения email.
+2. В **Authentication → URL Configuration** установите **Site URL** на `https://portal.living-things.org/`. В разрешённые редиректы добавьте `https://portal.living-things.org/**` и `https://evgeniypusser.github.io/git-living-things/**` для возврата после подтверждения email.
 3. Настройте SMTP Supabase для писем подтверждения внешним пользователям. Проверьте форму регистрации и загрузку файла с отдельного тестового аккаунта на публичном сайте.
 
 Хранилища SQLite и Supabase создаются отдельно. Для переноса существующих локальных аккаунтов и паспортов потребуется отдельный импорт.

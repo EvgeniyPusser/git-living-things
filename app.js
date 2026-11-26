@@ -11,7 +11,9 @@ const taxonomy = { level: levels, type: types, stage: stages, property: properti
 const filterKeys = ['q', 'level', 'type', 'stage', 'property', 'evidence', 'person'];
 const engineeringKeys = ['composition', 'characteristics', 'interfaces', 'conditions'];
 const originKeys = ['sources', 'rules', 'transfer', 'license'];
-const useCloud = location.origin === 'https://evgeniypusser.github.io' && /^\/git-living-things(?:\/|$)/.test(location.pathname);
+// The public site runs on its own domain; the GitHub Pages address redirects there.
+const useCloud = location.origin === 'https://portal.living-things.org' ||
+  (location.origin === 'https://evgeniypusser.github.io' && /^\/git-living-things(?:\/|$)/.test(location.pathname));
 let cloudBackend;
 const cloud = () => cloudBackend ??= import('./supabase-backend.js');
 function preference(key, value) {

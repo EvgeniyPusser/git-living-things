@@ -9,7 +9,7 @@
 // (both evgenii@living-things.org).
 import nodemailer from 'npm:nodemailer@6.9.16';
 
-const portal = 'https://evgeniypusser.github.io/git-living-things/';
+const portal = 'https://portal.living-things.org/';
 const env = (name: string, fallback = '') => Deno.env.get(name) || fallback;
 const user = env('SMTP_USER', 'evgenii@living-things.org');
 const transport = nodemailer.createTransport({
