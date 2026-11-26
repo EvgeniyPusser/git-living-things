@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Living House helper</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="titles">
+    <h1 id="title"></h1>
+    <p id="intro" class="mut"></p>
+    <input id="name" aria-label="Model name" maxlength="120">
+  </div>
+  <div class="score" id="score" aria-live="polite"></div>
+</header>
+<div class="tools">
+  <button id="save" class="primary"></button>
+  <label id="open" class="button"><span id="open-label"></span><input id="file" type="file" accept=".json,application/json" hidden></label>
+  <button id="reset"></button>
+  <button id="lang"></button>
+  <button id="theme"></button>
+  <span id="readonly" class="pill" hidden></span>
+  <span id="msg" class="mut" role="status"></span>
+</div>
+<p id="hint" class="mut small"></p>
+<nav class="tabs" role="tablist" id="tabs"></nav>
+<main class="main">
+  <section>
+    <div class="fig"><svg id="svg" role="img" aria-label="House graph"></svg></div>
+    <div class="legend"><span><i class="green"></i><span id="lg-green"></span></span><span><i class="yellow"></i><span id="lg-yellow"></span></span><span><i class="red"></i><span id="lg-red"></span></span></div>
+    <div class="card" id="card"></div>
+  </section>
+  <section class="card">
+    <p id="help" class="mut"></p>
+    <div id="panel"></div>
+  </section>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>

@@ -3,6 +3,8 @@ import { domains, levels, types, properties, evidence, stages, relations, passpo
   attachmentCategories, attachmentLimits, houseProjectFields, houseProjectGroups } from './taxonomy.js';
 import { domainResearch, foundationalResearch, territoryInterfaces, testRegistry, urbanPrototype } from './research.js';
 import { concreteStudy, examples, exampleDomain, exampleImagePath, guideCases, houseProjectExample } from './examples.js';
+import { validateModel } from './house-model/graph.js';
+import { suggestions, applySuggestion } from './house-model/suggest.js';
 
 const main = document.querySelector('#main');
 const header = document.querySelector('#header');
@@ -506,10 +508,11 @@ async function passportView(id, version) {
     panel('history', '<ul class="compact-list">' + versions.join('') + '</ul>') +
     panel('discussions', (comments.join('') || '<p class="muted">' + tr('noComments') + '</p>') + discuss) + removal);
 }
-// The Living House program (separate repository, published on GitHub Pages) runs in a sandboxed
-// iframe and talks to the portal through postMessage; the protocol is in living-house-model/PORTAL.md.
-// The program never sees credentials: the portal stores its model as an attachment of the passport.
-const houseApp = 'https://evgeniypusser.github.io';
+// The Living House helper (house-model/, served with the portal) runs in a same-origin iframe and talks
+// to the portal through postMessage; the protocol is in house-model/bridge.js. The portal, not the helper,
+// stores the model as an attachment of the passport. Same origin means the sandbox does not isolate the
+// helper from the portal page, so the helper escapes everything it renders.
+const houseApp = location.origin;
 const houseModelFile = /\.living-house\.json$/i;
 const houseModelLimit = 5 * 1024 * 1024;
 let houseContext = null;
@@ -531,7 +534,7 @@ async function latestHouseModel(id) {
 }
 async function saveHouseModel(id, model, name) {
   if (!houseContext?.editable) throw new Error('forbidden');
-  if (model?.format !== 'living-house-model') throw new Error('fileInvalid');
+  if (model?.format !== 'living-house-model' || model.version !== '1.0') throw new Error('fileInvalid');
   const json = JSON.stringify(model, null, 2);
   if (json.length > houseModelLimit) throw new Error('large');
   const base = String(name || 'living-house').replace(houseModelFile, '').replace(/[^\p{L}\p{N} ._-]+/gu, '_').trim().slice(0, 120) || 'living-house';
@@ -550,8 +553,8 @@ window.addEventListener('message', async event => {
       replyHouse({ type: 'saved' });
     } else if (event.data.type === 'ready' || event.data.type === 'open-request') {
       const model = await latestHouseModel(id);
-      if (model) replyHouse({ type: 'model', model });
-      else if (event.data.type === 'open-request') replyHouse({ type: 'error', message: tr('noFiles') });
+      if (model || event.data.type === 'ready') replyHouse({ type: 'model', model });
+      else replyHouse({ type: 'error', message: tr('noFiles') });
     }
   } catch (error) {
     replyHouse({ type: 'error', message: tr(errorMessage(error)) });
@@ -589,7 +592,25 @@ function houseProjectEditor(details = {}) {
     houseProjectGroups.map(({ label, fields }) => '<fieldset class="grid-2"><legend>' + text(label[language]) + '</legend>' +
       Object.entries(fields).map(([key, [field, prompt]]) => '<div class="architecture-field">' +
         area('detail.buildings.' + key, field[language], details[key], 'aria-describedby="house-' + key + '"') +
-        '<p class="muted" id="house-' + key + '">' + text(prompt[language]) + '</p></div>').join('') + '</fieldset>').join('') + '</div>';
+        '<p class="muted" id="house-' + key + '">' + text(prompt[language]) + '</p>' + houseVariant(key) + '</div>').join('') + '</fieldset>').join('') + '</div>';
+}
+// Text drafted from the passport's Living House model. Shown under a field only on request; nothing is
+// put into the field unless the client presses Insert or Append, and Insert never replaces own text.
+let houseVariants = {};
+function houseVariant(key) {
+  if (!houseVariants[key]) return '';
+  const act = (action, label) => '<button type="button" class="secondary" data-action="' + action + '" data-field="' + key + '">' + tr(label) + '</button>';
+  return '<details class="house-variant" data-variant="' + key + '"><summary>' + tr('houseVariant') + '</summary><pre>' + text(houseVariants[key]) +
+    '</pre><div class="actions">' + act('house-insert', 'houseInsert') + act('house-append', 'houseAppend') + act('house-hide', 'houseHide') + '</div></details>';
+}
+async function loadHouseVariants(id, files) {
+  if (!id || !files?.some(file => houseModelFile.test(file.name))) return {};
+  try {
+    const model = await latestHouseModel(id);
+    return validateModel(model).ok ? suggestions(model, language) : {};
+  } catch {
+    return {}; // No variants: the editor works exactly as without a model.
+  }
 }
 function editSections(passport, candidates) {
   const chosen = passport.domains || [];
@@ -691,7 +712,11 @@ async function openEditor(id, params, routeToken) {
   if (id && !loaded.passport.editable) throw new Error('forbidden');
   const candidates = allRecords.filter(item => item.id !== id);
   const passport = reused || loaded?.passport || initial;
-  if (routeToken === generation) editorState = { candidates, route: location.hash, passport };
+  const variants = await loadHouseVariants(id, loaded?.files);
+  if (routeToken === generation) {
+    houseVariants = variants; // a slower, older editor load must not put its variants into this one
+    editorState = { candidates, route: location.hash, passport };
+  }
   return editorPage(passport, candidates);
 }
 function nextURL(value) {
@@ -880,6 +905,19 @@ document.addEventListener('click', async event => {
   const control = event.target.closest('[data-action]');
   if (!control) return;
   const action = control.dataset.action;
+  if (['house-insert', 'house-append', 'house-hide'].includes(action)) {
+    const key = control.dataset.field;
+    const box = control.closest('.house-variant');
+    const field = main.querySelector('[name="detail.buildings.' + key + '"]');
+    if (action === 'house-hide' || !field) return box.remove();
+    const mode = action === 'house-insert' ? 'insert' : 'append';
+    const before = field.value;
+    field.value = applySuggestion(before, houseVariants[key], mode);
+    box.querySelector('.notice')?.remove();
+    if (mode === 'insert' && field.value === before && before.trim()) box.insertAdjacentHTML('beforeend', notice('houseInsertBlocked'));
+    else field.dispatchEvent(new Event('input', { bubbles: true }));
+    return;
+  }
   if (action === 'download-cloud-file') {
     event.preventDefault();
     try {
@@ -891,7 +929,7 @@ document.addEventListener('click', async event => {
     return;
   }
   if (action === 'open-house-model' && houseContext) {
-    const src = houseApp + '/living-house-model/?' + new URLSearchParams({ portal: location.origin, lang: language ? 'en' : 'ru' });
+    const src = 'house-model/?' + new URLSearchParams({ portal: '1', lang: language ? 'en' : 'ru', ...(houseContext.editable ? {} : { readonly: '1' }) });
     control.parentElement.innerHTML = '<iframe class="house-frame" data-passport="' + attr(houseContext.id) + '" src="' + attr(src) +
       '" title="' + attr(tr('houseModel')) + '" sandbox="allow-scripts allow-same-origin allow-downloads allow-forms allow-modals"' +
       ' referrerpolicy="no-referrer" loading="lazy"></iframe>';

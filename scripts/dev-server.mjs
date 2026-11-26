@@ -448,6 +448,10 @@ const staticFiles = {
   '/research.js': ['research.js', 'text/javascript'],
   '/examples.js': ['examples.js', 'text/javascript'],
   '/scripts/open-local.js': ['scripts/open-local.js', 'text/javascript'],
+  '/house-model/': ['house-model/index.html', 'text/html'], '/house-model/index.html': ['house-model/index.html', 'text/html'],
+  '/house-model/style.css': ['house-model/style.css', 'text/css'],
+  ...Object.fromEntries(['app', 'bridge', 'check', 'graph', 'i18n', 'suggest', 'view'].map(name =>
+    ['/house-model/' + name + '.js', ['house-model/' + name + '.js', 'text/javascript']])),
   '/taxonomy.js': ['taxonomy.js', 'text/javascript'], '/locale.js': ['locale.js', 'text/javascript'],
   '/buildings/urban-graph.html': ['buildings/urban-graph.html', 'text/html'],
   '/buildings/urban-graph.css': ['buildings/urban-graph.css', 'text/css'],
@@ -492,7 +496,7 @@ async function serveVideo(req, res, file) {
 const server = createServer(async (req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'same-origin');
-  res.setHeader('Content-Security-Policy', "default-src 'self'; frame-src https://evgeniypusser.github.io; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'");
+  res.setHeader('Content-Security-Policy', "default-src 'self'; frame-src 'self'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'; object-src 'none'");
   try {
     const url = new URL(req.url, 'http://localhost');
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);

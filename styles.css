@@ -207,6 +207,9 @@ tr:last-child td, tbody tr:last-child th { border-bottom: 0; }
 .example-chain li + li::before { content: '↳'; margin-inline-end: .35rem; color: var(--muted); }
 .example-results { min-width: 24rem; }
 .architecture-field p { margin-top: .35rem; font-size: .875rem; }
+.house-variant { margin-top: .5rem; border: 1px dashed currentColor; border-radius: .5rem; padding: .5rem .75rem; opacity: .95; }
+.house-variant summary { cursor: pointer; font-weight: 600; }
+.house-variant pre { white-space: pre-wrap; font: inherit; font-size: .875rem; margin: .5rem 0; }
 .data { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin: 0; }
 .data dt { color: var(--muted); font-size: .875rem; }
 .data dd { margin: .15rem 0 0; }
