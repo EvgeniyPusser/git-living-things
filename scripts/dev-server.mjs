@@ -492,7 +492,7 @@ async function serveVideo(req, res, file) {
 const server = createServer(async (req, res) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'same-origin');
-  res.setHeader('Content-Security-Policy', "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'");
+  res.setHeader('Content-Security-Policy', "default-src 'self'; frame-src https://evgeniypusser.github.io; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; object-src 'none'");
   try {
     const url = new URL(req.url, 'http://localhost');
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);

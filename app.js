@@ -490,17 +490,73 @@ async function passportView(id, version) {
   const comments = data.comments.map(item => '<article class="comment tight"><p><strong>' + text(item.name) +
     '</strong> <span class="muted">· ' + date(item.created) + '</span></p><p class="preline">' + text(item.message) + '</p>' +
     (item.deletable ? '<div>' + removeButton(endpoint + '/comments/' + encodeURIComponent(item.id), 'reload') + '</div>' : '') + '</article>');
+  const hasModel = data.files.some(file => houseModelFile.test(file.name));
+  houseContext = { id, editable: passport.editable };
+  const houseModel = hasModel || (passport.editable && passport.domains.includes('buildings')) ?
+    panel('houseModel', '<p class="muted">' + tr(passport.editable ? 'houseModelHelp' : 'houseModelReadonly') + '</p>' +
+      '<div class="house-model">' + customButton('openHouseModel', 'open-house-model') + '</div>') : '';
   const removal = passport.editable ? panel('removeZone', '<p class="muted">' + tr('removePassportHelp') + '</p><div>' +
     removeButton(endpoint, '#/catalog', 'removePassport') + '</div>') : '';
   const discuss = user ? '<form class="tight" data-form="comment" data-id="' + attr(id) + '">' +
     area('message', tr('message'), '', 'required') + formStatus + '<div>' + submit('send', true) + '</div></form>' :
     '<p><a href="' + attr(accountURL(passportURL(id))) + '">' + tr('signIn') + '</a></p>';
   return layout(location + heading + cover + content +
-    panel('related', related.length ? '<ul class="compact-list">' + related.join('') + '</ul>' : '<p class="muted">' + tr('noRelated') + '</p>') +
+    houseModel + panel('related', related.length ? '<ul class="compact-list">' + related.join('') + '</ul>' : '<p class="muted">' + tr('noRelated') + '</p>') +
     panel('files', (files.length ? '<ul class="compact-list">' + files.join('') + '</ul>' : '<p class="muted">' + tr('noFiles') + '</p>') + upload) +
     panel('history', '<ul class="compact-list">' + versions.join('') + '</ul>') +
     panel('discussions', (comments.join('') || '<p class="muted">' + tr('noComments') + '</p>') + discuss) + removal);
 }
+// The Living House program (separate repository, published on GitHub Pages) runs in a sandboxed
+// iframe and talks to the portal through postMessage; the protocol is in living-house-model/PORTAL.md.
+// The program never sees credentials: the portal stores its model as an attachment of the passport.
+const houseApp = 'https://evgeniypusser.github.io';
+const houseModelFile = /\.living-house\.json$/i;
+const houseModelLimit = 5 * 1024 * 1024;
+let houseContext = null;
+function houseFrame() {
+  return main.querySelector('iframe.house-frame');
+}
+function replyHouse(message) {
+  houseFrame()?.contentWindow.postMessage({ source: 'living-things-portal', ...message }, houseApp);
+}
+async function latestHouseModel(id) {
+  const files = (await api('passports/' + encodeURIComponent(id))).files.filter(file => houseModelFile.test(file.name));
+  const file = files.at(-1);
+  if (!file) return null;
+  const url = useCloud ? await (await cloud()).downloadCloudFile(id, file.id, file.name) :
+    '/api/passports/' + encodeURIComponent(id) + '/files/' + encodeURIComponent(file.id);
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('failed');
+  return response.json();
+}
+async function saveHouseModel(id, model, name) {
+  if (!houseContext?.editable) throw new Error('forbidden');
+  if (model?.format !== 'living-house-model') throw new Error('fileInvalid');
+  const json = JSON.stringify(model, null, 2);
+  if (json.length > houseModelLimit) throw new Error('large');
+  const base = String(name || 'living-house').replace(houseModelFile, '').replace(/[^\p{L}\p{N} ._-]+/gu, '_').trim().slice(0, 120) || 'living-house';
+  const form = new FormData();
+  form.set('category', 'system');
+  form.set('revision', new Date().toISOString().slice(0, 16).replace('T', ' '));
+  await uploadAttachment(id, new File([json], base + '.living-house.json', { type: 'application/json' }), form);
+}
+window.addEventListener('message', async event => {
+  const frame = houseFrame();
+  if (!frame || event.origin !== houseApp || event.source !== frame.contentWindow || event.data?.source !== 'living-house-model') return;
+  const id = frame.dataset.passport;
+  try {
+    if (event.data.type === 'save') {
+      await saveHouseModel(id, event.data.model, event.data.filename);
+      replyHouse({ type: 'saved' });
+    } else if (event.data.type === 'ready' || event.data.type === 'open-request') {
+      const model = await latestHouseModel(id);
+      if (model) replyHouse({ type: 'model', model });
+      else if (event.data.type === 'open-request') replyHouse({ type: 'error', message: tr('noFiles') });
+    }
+  } catch (error) {
+    replyHouse({ type: 'error', message: tr(errorMessage(error)) });
+  }
+});
 function accountView() {
   if (!user) return authPage('login', new URLSearchParams({ next: '#/account' }));
   return layout(crumbs(tr('accountTitle')) + '<section class="panel tight"><h1>' + tr('accountTitle') + '</h1><p>' +
@@ -832,6 +888,13 @@ document.addEventListener('click', async event => {
     } catch (error) {
       control.closest('li').insertAdjacentHTML('beforeend', notice(errorMessage(error), true));
     }
+    return;
+  }
+  if (action === 'open-house-model' && houseContext) {
+    const src = houseApp + '/living-house-model/?' + new URLSearchParams({ portal: location.origin, lang: language ? 'en' : 'ru' });
+    control.parentElement.innerHTML = '<iframe class="house-frame" data-passport="' + attr(houseContext.id) + '" src="' + attr(src) +
+      '" title="' + attr(tr('houseModel')) + '" sandbox="allow-scripts allow-same-origin allow-downloads allow-forms allow-modals"' +
+      ' referrerpolicy="no-referrer" loading="lazy"></iframe>';
     return;
   }
   if (action === 'remove') {
