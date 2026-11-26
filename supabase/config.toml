@@ -1,1 +1,5 @@
 project_id = "git-living-things"
+
+[functions.notify-owner]
+# Called by database triggers with a shared secret, not with a user JWT.
+verify_jwt = false
