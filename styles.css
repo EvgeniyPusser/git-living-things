@@ -177,6 +177,8 @@ tr:last-child td, tbody tr:last-child th { border-bottom: 0; }
 .guide-steps li::marker { font-weight: 700; color: var(--accent-dark); }
 .guide-steps li p { margin-top: .35rem; max-width: 85ch; }
 .guide-reference { margin-top: .85rem; }
+.test-registry-table { min-width: 31rem; }
+.test-registry-table tbody th { text-align: start; width: 32%; }
 .house-project-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; margin: 0; }
 .house-project-grid > div { padding: .75rem .85rem; border: 1px solid var(--line); border-radius: .4rem; }
 .house-project-grid dt { font-weight: 680; }

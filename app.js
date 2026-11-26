@@ -1,7 +1,7 @@
 import { strings } from './locale.js';
 import { domains, levels, types, properties, evidence, stages, relations, passportFields, claimFields, architectureFields,
   attachmentCategories, attachmentLimits, houseProjectFields, houseProjectGroups } from './taxonomy.js';
-import { domainResearch, foundationalResearch } from './research.js';
+import { domainResearch, foundationalResearch, territoryInterfaces, testRegistry, urbanPrototype } from './research.js';
 import { concreteStudy, examples, exampleDomain, exampleImagePath, guideCases, houseProjectExample } from './examples.js';
 
 const main = document.querySelector('#main');
@@ -65,6 +65,7 @@ const crumbs = (...parts) => '<div class="crumbs"><a href="#/">' + tr('home') + 
 const catalogLink = '<a href="#/catalog">';
 const createURL = domain => '#/new' + (domain ? '?' + new URLSearchParams({ domain }) : '');
 const exampleDraftURL = key => '#/new?' + new URLSearchParams({ domain: exampleDomain(key), example: key });
+const testRegistryURL = group => '#/tests' + (group ? '?' + new URLSearchParams({ group }) : '');
 const accountURL = next => '#/login?' + new URLSearchParams({ next });
 const recordLabel = item => text(tr(item.status) + ' · ' + tr(item.visibility));
 const safeLink = (url, label) => '<a href="' + attr(url) + '" rel="noreferrer">' + text(label) + '</a>';
@@ -94,7 +95,8 @@ function frame(route) {
   header.innerHTML = '<a class="skip" href="#main" data-action="skip">' + tr('skip') + '</a><header class="top"><div class="wrap">' +
     '<a class="brand" href="#/"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Living Things</a>' +
     '<nav class="primary-nav" aria-label="' + tr('portal') + '"><a href="#/"' + current('') + '>' + tr('home') +
-    '</a><a href="#/guide"' + current('guide') + '>' + tr('guide') + '</a><a href="#/catalog"' + current('catalog') + '>' + tr('catalog') + '</a></nav>' +
+    '</a><a href="#/guide"' + current('guide') + '>' + tr('guide') + '</a><a href="#/catalog"' + current('catalog') + '>' + tr('catalog') +
+    '</a><a href="#/tests"' + current('tests') + '>' + tr('testRegistry') + '</a></nav>' +
     '<nav class="nav-end" aria-label="' + tr('accountSettings') + '">' +
     (user ? '<span class="account-name">' + text(user.name) + '</span><button type="button" data-action="logout">' + tr('signOut') + '</button>'
       : '<a href="#/login"' + current('login') + '>' + tr('signIn') + '</a>') +
@@ -182,6 +184,14 @@ function houseProjectSample() {
       '</p></dd></div>').join('') + '</dl></section>').join('');
   return panel('houseProjectExample', '<p>' + tr('houseProjectExampleNote') + '</p>' + flow + sections);
 }
+function territoryContext(key) {
+  if (!Object.hasOwn(territoryInterfaces, key)) return '';
+  const entries = territoryInterfaces[key].map(([label, explanation]) => [label[language], explanation[language]]);
+  const note = key === 'factory' ? 'territoryFactory' : 'territorySketch';
+  return panel('territoryLinks', '<p class="muted">' + tr(note) + '</p>' + descriptionList(entries) +
+    '<div class="actions">' + button('territoryTests', testRegistryURL(key === 'factory' ? 'factory' : 'neighbourhood'), true) +
+    safeLink(urbanPrototype, tr('testOpenUrban')) + '</div>');
+}
 async function guide(params) {
   const selection = params.get('object');
   const key = Object.hasOwn(guideCases, selection) ? selection : 'buildings';
@@ -227,7 +237,8 @@ async function guide(params) {
     ['passportPurpose', ['passportText', 'evidenceText']], ['related', ['relationText']], ['findTitle', ['findText']]
   ];
   return layout(crumbs(tr('guide')) + '<div class="tight"><h1>' + tr('guideHeading') + '</h1><p class="muted">' + tr('guideIntro') + '</p></div>' +
-    chooser + sampleView + (key === 'house' ? houseProjectSample() : '') + panel('guideSteps', '<ol class="guide-steps">' + steps + '</ol>') + sourceList +
+    chooser + sampleView + (key === 'house' ? houseProjectSample() : '') + territoryContext(key === 'grid' ? 'neighbourhood' : key) +
+    panel('guideSteps', '<ol class="guide-steps">' + steps + '</ol>') + sourceList +
     panel('guideFilesMissing', paragraph(route.missing ? words(route.missing) : tr('guideDataNote'))) +
     researchLinks(foundationalResearch, available, 'researchBackground') +
     '<details><summary>' + tr('guideReference') + '</summary><div class="stack guide guide-reference">' +
@@ -247,6 +258,28 @@ function catalogURL(params, change = {}) {
 }
 function chip(label, href, active) {
   return '<a class="chip" href="' + attr(href) + '"' + (active ? ' aria-current="true"' : '') + '>' + text(label) + '</a>';
+}
+async function testRegistryView(params) {
+  const requestedGroup = params.get('group');
+  const selected = Object.hasOwn(testRegistry, requestedGroup) ? requestedGroup : '';
+  const groups = Object.entries(testRegistry);
+  const filter = '<nav class="chips" aria-label="' + tr('testChoose') + '">' +
+    chip(tr('testAll'), testRegistryURL(), !selected) + groups.map(([key, group]) =>
+      chip(group.label[language], testRegistryURL(key), key === selected)).join('') + '</nav>';
+  const available = await localResearch();
+  const registry = groups.filter(([key]) => !selected || selected === key).map(([, group]) => {
+    const rows = group.tests.map(([id, label, inputs, output]) => '<tr><th scope="row"><span class="muted mono">' + text(id) +
+      '</span><br>' + text(label[language]) + '</th><td>' + text(inputs[language]) + '</td><td>' + text(output[language]) + '</td></tr>');
+    const sources = group.sources.map(([label, url]) => [label, Array.isArray(url) ? url[language] : url])
+      .filter(([, url]) => !url.startsWith('/research/') || available.has(url));
+    return '<section class="panel tight"><div class="page-top"><h2>' + text(group.label[language]) +
+      '</h2><p class="muted">' + tr(group.status) + '</p></div>' +
+      table([tr('testRegistry'), tr('testInput'), tr('testOutput')], rows, 'test-registry-table') +
+      '<div class="actions"><a href="#/example/' + attr(group.example) + '">' + tr('testOpenExample') + '</a>' +
+      sources.map(([label, url]) => safeLink(url, tr(label))).join('') + '</div></section>';
+  }).join('');
+  return layout(crumbs(tr('testRegistry')) + '<div class="tight"><h1>' + tr('testRegistry') + '</h1><p class="muted">' +
+    tr('testRegistryIntro') + '</p></div>' + filter + registry);
 }
 async function showCatalog(params) {
   const domainKey = params.get('domain');
@@ -290,7 +323,8 @@ async function showCatalog(params) {
     (hasFilters ? button('reset', base, true) : button('create', createURL(domainKey), true)) + '</div></section>';
   return layout(crumbs(tr('catalog')) + '<div class="tight"><h1>' + heading + '</h1><p class="muted">' +
     (domain?.description[language] || tr('catalogAbout')) + '</p></div>' +
-    (hasFilters ? '' : exampleGallery(keys)) + researchLinks(research, available) + classification +
+    (hasFilters ? '' : exampleGallery(keys)) + (domainKey === 'infrastructure' ? territoryContext('neighbourhood') : '') +
+    researchLinks(research, available) + classification +
     '<div class="catalog-layout">' + filterForm + '<section class="tight">' + compare + listing +
     (records?.length ? '<div>' + button('create', createURL(domainKey), true) + '</div>' : '') + '</section></div>');
 }
@@ -355,7 +389,8 @@ async function exampleView(key) {
   return layout(crumbs(catalogLink + tr('catalog') + '</a>', domainLink, tr('exampleTitle')) +
     '<div class="panel example-intro"><div class="tight"><p class="eyebrow">' + tr('exampleTitle') + '</p><h1>' + words(example.title) +
     '</h1><p class="muted">' + words(example.summary) + '</p>' + details + '</div>' + image + '</div>' +
-    researchLinks(relatedResearch, available, 'researchMore', sourceLinks) + (key === 'house' ? houseProjectSample() : '') + relationsBlock + design +
+    researchLinks(relatedResearch, available, 'researchMore', sourceLinks) + (key === 'house' ? houseProjectSample() : '') +
+    territoryContext(key === 'grid' ? 'neighbourhood' : key) + relationsBlock + design +
     panel('exampleData', '<p>' + words(example.documents) + '</p>') +
     panel('exampleProcedure', '<p>' + words(example.procedure) + '</p>') +
     panel(example.stage === 'concept' ? 'exampleTarget' : 'exampleResult', exampleResultsTable(example) + '<p>' + words(example.outcome) + '</p>') +
@@ -584,6 +619,7 @@ async function render({ focus = false, keepScroll = false } = {}) {
     switch (route) {
       case '': result = home(); break;
       case 'guide': result = await guide(params); break;
+      case 'tests': result = await testRegistryView(params); break;
       case 'catalog': result = await showCatalog(params); break;
       case 'example': result = await exampleView(id); break;
       case 'compare': result = await compareView(params); break;

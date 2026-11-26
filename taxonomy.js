@@ -27,6 +27,8 @@ export const houseProjectGroups = [
         ['Запишите обязательные функции, ограничения, разрешённые действия и условия остановки или передачи решения человеку.', 'Record essential functions, constraints, allowed actions and conditions for stopping or handing decisions to a person.']],
       ownerInterface: [['Связь с хозяином и обслуживающей командой', 'Owner and maintenance interface'],
         ['Укажите, кому, по какому каналу и с какими данными приходит уведомление. Опишите права подтверждения, ручного вмешательства и изменения правил.', 'Specify recipients, channel and notification data. Describe approval, manual intervention and rule-change permissions.']],
+      ownerConstitution: [['Конституция отношений с хозяевами', 'Constitution for relations with owners'],
+        ['Укажите права владельцев, жильцов и службы обслуживания, пределы автономии дома, порядок согласования действий и правила доступа к данным, включая смену владельца.', 'Specify the rights of owners, occupants and maintainers, the limits of autonomy, approvals and data access, including transfer of ownership.']],
       environmentInterface: [['Связь с окружающей средой', 'Environmental interfaces'],
         ['Укажите внешние воздействия и обмен ресурсами. Разделите измеряемые условия и проектные допущения.', 'Specify external exposure and exchanges of resources. Distinguish measured conditions and design assumptions.']]
     }
