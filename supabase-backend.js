@@ -1,7 +1,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.89.0/+esm';
 import { architectureFields, attachmentCategories, claimFields, domains, passportFields, properties } from './taxonomy.js';
 
-const client = createClient('https://pyqqnypzlhcryvjkkoaf.supabase.co', 'sb_publishable_XbU-9OeNFKnqHDbyZhBU6Q_GA7SogQ3', {
+const client = createClient('https://ojrkjqzgusanpmxnjuxa.supabase.co', 'sb_publishable_49T1pFfTmlCXRwZIi5cyKw_tk12WK6k', {
   auth: { flowType: 'pkce' }
 });
 const bucket = client.storage.from('lt-passport-files');
