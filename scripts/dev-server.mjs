@@ -50,6 +50,13 @@ const maxAttachments = attachmentLimits.passportMiB * 1024 * 1024;
 const fileUploadPath = /^\/api\/passports\/[a-f0-9-]{36}\/files$/;
 const delayWindow = 15 * 60 * 1000;
 const attempts = new Map();
+const trustProxy = process.env.LIVING_THINGS_TRUST_PROXY === '1';
+// Behind a reverse proxy every request arrives from the proxy's address, so the client is the last
+// X-Forwarded-For entry, which the proxy itself appends. Without a proxy the header is client-controlled.
+function clientAddress(req) {
+  const forwarded = trustProxy && req.headers['x-forwarded-for']?.split(',').at(-1).trim();
+  return forwarded || req.socket.remoteAddress;
+}
 
 class RequestError extends Error {
   constructor(status, code) {
@@ -158,11 +165,12 @@ async function authenticate(req, res, path) {
   if (attempts.size > 1000) {
     for (const [ip, record] of attempts) if (record.until <= time) attempts.delete(ip);
   }
-  const key = req.socket.remoteAddress;
+  const key = clientAddress(req);
   const last = attempts.get(key);
   const record = last && last.until > time ? last : { count: 0, until: time + delayWindow };
   requireValue(record.count < 30, 429, 'rate');
   attempts.set(key, record);
+  // Counted up front so parallel guesses share the limit; a successful login gives the attempt back below.
   record.count += 1;
   const data = await body(req);
   const email = clean(data.email, 254).toLowerCase();
@@ -182,6 +190,7 @@ async function authenticate(req, res, path) {
   const [salt, secret] = account?.password.split(':') || ['invalid-account', '00'.repeat(64)];
   const actual = await hashPassword(password, salt, 64);
   requireValue(account && timingSafeEqual(actual, Buffer.from(secret, 'hex')), 401, 'loginFailed');
+  record.count -= 1;
   return login(req, res, { id: account.id, name: account.name, email });
 }
 
