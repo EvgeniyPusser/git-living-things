@@ -11,6 +11,9 @@ const taxonomy = { level: levels, type: types, stage: stages, property: properti
 const filterKeys = ['q', 'level', 'type', 'stage', 'property', 'evidence', 'person'];
 const engineeringKeys = ['composition', 'characteristics', 'interfaces', 'conditions'];
 const originKeys = ['sources', 'rules', 'transfer', 'license'];
+const useCloud = location.origin === 'https://evgeniypusser.github.io' && /^\/git-living-things(?:\/|$)/.test(location.pathname);
+let cloudBackend;
+const cloud = () => cloudBackend ??= import('./supabase-backend.js');
 function preference(key, value) {
   try {
     if (value === undefined) return localStorage.getItem(key);
@@ -71,6 +74,7 @@ const recordLabel = item => text(tr(item.status) + ' · ' + tr(item.visibility))
 const safeLink = (url, label) => '<a href="' + attr(url) + '" rel="noreferrer">' + text(label) + '</a>';
 
 async function api(path, method = 'GET', values, signal) {
+  if (useCloud) return (await cloud()).cloudApi(path, method, values, signal);
   const response = await fetch('./api/' + path, {
     method, signal, headers: values === undefined ? {} : { 'Content-Type': 'application/json' },
     body: values === undefined ? undefined : JSON.stringify(values)
@@ -394,9 +398,11 @@ async function exampleView(key) {
     panel('exampleData', '<p>' + words(example.documents) + '</p>') +
     panel('exampleProcedure', '<p>' + words(example.procedure) + '</p>') +
     panel(example.stage === 'concept' ? 'exampleTarget' : 'exampleResult', exampleResultsTable(example) + '<p>' + words(example.outcome) + '</p>') +
-    panel('exampleStorageTitle', '<p>' + tr('exampleStorage') + '</p><div class="actions">' +
+    panel('exampleStorageTitle', '<p>' + tr(useCloud ? 'exampleCloudStorage' : 'exampleStorage') + '</p><div class="actions">' +
       button('exampleOwn', exampleDraftURL(key)) +
-      (example.columns ? '<a href="./examples/' + attr(key) + '.csv" download>' + tr('exampleTemplate') + '</a>' : '') + '</div>'));
+      (example.columns ? '<a href="' + (useCloud ? 'data:text/csv;charset=utf-8,' +
+        encodeURIComponent(example.columns.join(',') + '\r\n') : './examples/' + attr(key) + '.csv') +
+        '" download="' + attr(key) + '-data-template.csv">' + tr('exampleTemplate') + '</a>' : '') + '</div>'));
 }
 function passportContent(passport) {
   const identity = [
@@ -444,13 +450,16 @@ async function passportView(id, version) {
     text((item.incoming ? tr('inbound') + ' · ' : '') + name(relations, item.type)) +
     (item.note ? '<p class="muted preline">' + text(item.note) + '</p>' : '') + '</li>');
   const fileURL = file => '/api/' + endpoint + '/files/' + encodeURIComponent(file.id);
-  const files = [...links, ...data.files.map(file => '<li><a href="' + fileURL(file) + '" download>' +
+  const fileLink = file => useCloud ?
+    'href="#" data-action="download-cloud-file" data-passport="' + attr(id) + '" data-file="' + attr(file.id) + '" data-filename="' + attr(file.name) + '"' :
+    'href="' + fileURL(file) + '" download';
+  const files = [...links, ...data.files.map(file => '<li><a ' + fileLink(file) + '>' +
     text(file.name) + '</a> · ' + text(name(attachmentCategories, file.category)) +
     (file.revision ? ' · ' + text(file.revision) : '') + ' · ' + new Intl.NumberFormat(language ? 'en' : 'ru', {
       style: 'unit', unit: file.size < 1000 ? 'byte' : 'kilobyte', maximumFractionDigits: 1
     }).format(file.size < 1000 ? file.size : file.size / 1000) + '</li>')];
-  const photo = data.files.find(file => file.category === 'image' && file.preview);
-  const cover = photo ? '<figure class="passport-photo"><img src="' + fileURL(photo) + '?preview=1" alt="' + attr(photo.name) +
+  const photo = data.files.find(file => file.category === 'image' && (useCloud ? file.previewURL : file.preview));
+  const cover = photo ? '<figure class="passport-photo"><img src="' + attr(useCloud ? photo.previewURL : fileURL(photo) + '?preview=1') + '" alt="' + attr(photo.name) +
     '"><figcaption>' + text(photo.name) + '</figcaption></figure>' : '';
   const upload = passport.editable ? '<form class="tight" data-form="file" data-id="' + attr(id) + '">' +
     '<p class="muted">' + tr('fileGuide') + '</p><div class="grid-2">' + select('category', tr('fileCategory'), attachmentCategories, 'other') +
@@ -508,7 +517,7 @@ function editSections(passport, candidates) {
     panel('related', '<div id="relation-list" class="tight">' + (passport.relations || []).map(item => relationEditor(item, candidates)).join('') +
       '</div>' + (candidates.length ? '<div>' + customButton('addRelation', 'add-relation') + '</div>' :
         '<p class="muted">' + tr('relationHelp') + '</p>')) +
-    panel('files', '<p class="muted">' + tr('exampleStorage') + '</p><div id="link-list" class="tight">' + (passport.links || []).map(linkEditor).join('') +
+    panel('files', '<p class="muted">' + tr(useCloud ? 'exampleCloudStorage' : 'exampleStorage') + '</p><div id="link-list" class="tight">' + (passport.links || []).map(linkEditor).join('') +
       '</div><div>' + customButton('addLink', 'add-link') + '</div>');
 }
 function claimEditor(item = {}) {
@@ -675,6 +684,7 @@ function editorData(form, status) {
 }
 async function uploadAttachment(id, file, data) {
   if (!file?.size || file.size > attachmentLimits.fileMiB * 1024 * 1024) throw new Error('fileInvalid');
+  if (useCloud) return (await cloud()).uploadCloudFile(id, file, data);
   const query = new URLSearchParams({ name: file.name, category: data.get('category'), revision: data.get('revision') });
   const response = await fetch('/api/passports/' + encodeURIComponent(id) + '/files?' + query, {
     method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file
@@ -712,7 +722,13 @@ document.addEventListener('submit', event => {
   }
   if (kind === 'register' || kind === 'login') {
     transact(form, async () => {
-      user = (await api(kind, 'POST', Object.fromEntries(data))).user;
+      const result = await api(kind, 'POST', { ...Object.fromEntries(data), next: form.dataset.next });
+      user = result.user;
+      if (result.confirmationRequired) {
+        flash = 'cloudCheckInbox';
+        routeTo(accountURL(form.dataset.next));
+        return;
+      }
       routeTo(form.dataset.next);
     });
   }
@@ -760,6 +776,16 @@ document.addEventListener('click', async event => {
   const control = event.target.closest('[data-action]');
   if (!control) return;
   const action = control.dataset.action;
+  if (action === 'download-cloud-file') {
+    event.preventDefault();
+    try {
+      const url = await (await cloud()).downloadCloudFile(control.dataset.passport, control.dataset.file, control.dataset.filename);
+      location.assign(url);
+    } catch (error) {
+      control.closest('li').insertAdjacentHTML('beforeend', notice(errorMessage(error), true));
+    }
+    return;
+  }
   if (action === 'play-intro') {
     const figure = control.closest('figure');
     const video = figure.querySelector('video');
@@ -828,6 +854,10 @@ if (location.protocol !== 'file:') {
     user = (await api('session', 'GET', undefined, AbortSignal.timeout(4500))).user;
   } catch {
     // Public examples work without a registry connection.
+  }
+  if (useCloud) {
+    const next = new URLSearchParams(location.search).get('lt-next');
+    if (next) history.replaceState(null, '', location.pathname + (user ? nextURL(next) : accountURL(nextURL(next))));
   }
   await render();
 }
