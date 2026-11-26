@@ -71,6 +71,9 @@ const exampleDraftURL = key => '#/new?' + new URLSearchParams({ domain: exampleD
 const testRegistryURL = group => '#/tests' + (group ? '?' + new URLSearchParams({ group }) : '');
 const accountURL = next => '#/login?' + new URLSearchParams({ next });
 const recordLabel = item => text(tr(item.status) + ' · ' + tr(item.visibility));
+// Deletion takes two clicks: the first arms the button, the second sends DELETE to the endpoint.
+const removeButton = (endpoint, after, label = 'deleteItem') => '<button class="secondary danger" type="button" data-action="remove" ' +
+  'data-endpoint="' + attr(endpoint) + '" data-after="' + attr(after) + '">' + tr(label) + '</button>';
 const safeLink = (url, label) => '<a href="' + attr(url) + '" rel="noreferrer">' + text(label) + '</a>';
 
 async function api(path, method = 'GET', values, signal) {
@@ -102,12 +105,13 @@ function frame(route) {
     '</a><a href="#/guide"' + current('guide') + '>' + tr('guide') + '</a><a href="#/catalog"' + current('catalog') + '>' + tr('catalog') +
     '</a><a href="#/tests"' + current('tests') + '>' + tr('testRegistry') + '</a></nav>' +
     '<nav class="nav-end" aria-label="' + tr('accountSettings') + '">' +
-    (user ? '<span class="account-name">' + text(user.name) + '</span><button type="button" data-action="logout">' + tr('signOut') + '</button>'
+    (user ? '<a class="account-name" href="#/account"' + current('account') + '>' + text(user.name) + '</a><button type="button" data-action="logout">' + tr('signOut') + '</button>'
       : '<a href="#/login"' + current('login') + '>' + tr('signIn') + '</a>') +
     '<button type="button" lang="' + (language ? 'ru' : 'en') + '" data-action="language">' +
     (language ? 'Русский' : 'English') + '</button><button type="button" data-action="theme">' +
     tr(dark ? 'lightTheme' : 'darkTheme') + '</button></nav></div></header>';
-  footer.innerHTML = '<footer class="foot"><div class="wrap"><span>Living Things · ' + tr('portal') + '</span><a href="#/guide">' + tr('guide') + '</a></div></footer>';
+  footer.innerHTML = '<footer class="foot"><div class="wrap"><span>Living Things · ' + tr('portal') + '</span><a href="#/guide">' + tr('guide') + '</a><a href="#/rules">' + tr('rulesTitle') +
+    '</a></div></footer>';
 }
 const homeExamples = ['house', 'transport', 'factory', 'ship', 'aviation', 'grid',
   'facade', 'buildings', 'infrastructure', 'robotics', 'other'];
@@ -128,6 +132,16 @@ function exampleGallery(keys, className = '') {
   return '<section class="tight' + (className ? ' ' + className : '') + '" aria-labelledby="examples-heading"><h2 id="examples-heading">' +
     tr('exampleGallery') + '</h2>' + exampleCards(keys) + '</section>';
 }
+// First thing invited researchers see: how to put their own work into the registry.
+function contributeSteps() {
+  const steps = [['contributeAccount', 'contributeAccountText'], ['contributeDraft', 'contributeDraftText'],
+    ['contributePublish', 'contributePublishText']];
+  return '<section class="panel contribute" aria-labelledby="contribute-heading"><div class="tight"><h2 id="contribute-heading">' +
+    tr('contributeTitle') + '</h2><p class="muted">' + tr('contributeLead') + '</p></div><ol class="contribute-steps">' +
+    steps.map(([heading, paragraph]) => '<li><h3>' + tr(heading) + '</h3><p class="muted">' + tr(paragraph) + '</p></li>').join('') +
+    '</ol><div class="actions">' + (user ? button('create', createURL()) : button('registerSubmit', '#/register')) +
+    button('openGuide', '#/guide', true) + '<a href="#/rules">' + tr('rulesTitle') + '</a></div></section>';
+}
 function home() {
   const videoLanguage = language ? 'en' : 'ru';
   const introVideo = '<figure class="intro-video"><figcaption>' + tr('introVideo') + '</figcaption>' +
@@ -139,7 +153,7 @@ function home() {
     '<p class="intro-video-fallback" hidden>' + safeLink('./assets/intro/living-things-' + videoLanguage + '.mp4', tr('openIntroFile')) + '</p></figure>';
   return layout('<section class="hero home-hero"><div class="tight"><p class="eyebrow">' + tr('portal') + '</p><h1>Living Things</h1><p>' +
     tr('tagline') + '</p></div>' + introVideo +
-    '</section>' + exampleGallery(homeExamples, 'home-examples') + globalSearch() + '<section class="panel intro"><h2>' + tr('intro') + '</h2>' +
+    '</section>' + contributeSteps() + exampleGallery(homeExamples, 'home-examples') + globalSearch() + '<section class="panel intro"><h2>' + tr('intro') + '</h2>' +
     [['meaning', 'meaningBrief'], ['scope', 'scopeText'], ['passportPurpose', 'passportText'], ['findTitle', 'findText']].map(([heading, paragraph]) =>
       '<div class="tight"><h3>' + tr(heading) + '</h3><p class="muted">' + tr(paragraph) + '</p></div>').join('') +
     '<div class="actions">' + button('openGuide', '#/guide', true) + '</div></section>');
@@ -457,7 +471,8 @@ async function passportView(id, version) {
     text(file.name) + '</a> · ' + text(name(attachmentCategories, file.category)) +
     (file.revision ? ' · ' + text(file.revision) : '') + ' · ' + new Intl.NumberFormat(language ? 'en' : 'ru', {
       style: 'unit', unit: file.size < 1000 ? 'byte' : 'kilobyte', maximumFractionDigits: 1
-    }).format(file.size < 1000 ? file.size : file.size / 1000) + '</li>')];
+    }).format(file.size < 1000 ? file.size : file.size / 1000) +
+    (passport.editable ? ' ' + removeButton(endpoint + '/files/' + encodeURIComponent(file.id), 'reload') : '') + '</li>')];
   const photo = data.files.find(file => file.category === 'image' && (useCloud ? file.previewURL : file.preview));
   const cover = photo ? '<figure class="passport-photo"><img src="' + attr(useCloud ? photo.previewURL : fileURL(photo) + '?preview=1') + '" alt="' + attr(photo.name) +
     '"><figcaption>' + text(photo.name) + '</figcaption></figure>' : '';
@@ -470,7 +485,10 @@ async function passportView(id, version) {
     tr('version') + ' ' + item.version + '</a> · ' + date(item.updated) +
     (item.changes ? '<p class="muted preline">' + text(item.changes) + '</p>' : '') + '</li>');
   const comments = data.comments.map(item => '<article class="comment tight"><p><strong>' + text(item.name) +
-    '</strong> <span class="muted">· ' + date(item.created) + '</span></p><p class="preline">' + text(item.message) + '</p></article>');
+    '</strong> <span class="muted">· ' + date(item.created) + '</span></p><p class="preline">' + text(item.message) + '</p>' +
+    (item.deletable ? '<div>' + removeButton(endpoint + '/comments/' + encodeURIComponent(item.id), 'reload') + '</div>' : '') + '</article>');
+  const removal = passport.editable ? panel('removeZone', '<p class="muted">' + tr('removePassportHelp') + '</p><div>' +
+    removeButton(endpoint, '#/catalog', 'removePassport') + '</div>') : '';
   const discuss = user ? '<form class="tight" data-form="comment" data-id="' + attr(id) + '">' +
     area('message', tr('message'), '', 'required') + formStatus + '<div>' + submit('send', true) + '</div></form>' :
     '<p><a href="' + attr(accountURL(passportURL(id))) + '">' + tr('signIn') + '</a></p>';
@@ -478,7 +496,21 @@ async function passportView(id, version) {
     panel('related', related.length ? '<ul class="compact-list">' + related.join('') + '</ul>' : '<p class="muted">' + tr('noRelated') + '</p>') +
     panel('files', (files.length ? '<ul class="compact-list">' + files.join('') + '</ul>' : '<p class="muted">' + tr('noFiles') + '</p>') + upload) +
     panel('history', '<ul class="compact-list">' + versions.join('') + '</ul>') +
-    panel('discussions', (comments.join('') || '<p class="muted">' + tr('noComments') + '</p>') + discuss));
+    panel('discussions', (comments.join('') || '<p class="muted">' + tr('noComments') + '</p>') + discuss) + removal);
+}
+function accountView() {
+  if (!user) return authPage('login', new URLSearchParams({ next: '#/account' }));
+  return layout(crumbs(tr('accountTitle')) + '<section class="panel tight"><h1>' + tr('accountTitle') + '</h1><p>' +
+    tr('accountSigned') + ' <strong>' + text(user.name) + '</strong></p><p><a href="#/rules">' + tr('rulesTitle') + '</a></p></section>' +
+    panel('removeAccount', '<p class="muted">' + tr('removeAccountHelp') + '</p><div>' +
+      removeButton('account', '#/', 'removeAccount') + '</div>'));
+}
+function rulesView() {
+  const sections = [['rulesOwnTitle', 'rulesOwnText'], ['rulesSeeTitle', 'rulesSeeText'], ['rulesRemoveTitle', 'rulesRemoveText'],
+    ['rulesDutyTitle', 'rulesDutyText'], ['rulesContactTitle', 'rulesContactText']];
+  return layout(crumbs(tr('rulesTitle')) + '<section class="panel stack"><div class="tight"><h1>' + tr('rulesTitle') + '</h1><p class="muted">' +
+    tr('rulesIntro') + '</p></div>' + sections.map(([heading, paragraph]) =>
+      '<div class="tight"><h2>' + tr(heading) + '</h2><p>' + tr(paragraph) + '</p></div>').join('') + '</section>');
 }
 
 const access = { public: strings.public, private: strings.private };
@@ -637,6 +669,8 @@ async function render({ focus = false, keepScroll = false } = {}) {
       case 'new': result = await openEditor(id, params, routeToken); break;
       case 'login':
       case 'register': result = authPage(route, params); break;
+      case 'account': result = accountView(); break;
+      case 'rules': result = rulesView(); break;
       default: throw new Error('missing');
     }
   } catch (error) {
@@ -783,6 +817,25 @@ document.addEventListener('click', async event => {
       location.assign(url);
     } catch (error) {
       control.closest('li').insertAdjacentHTML('beforeend', notice(errorMessage(error), true));
+    }
+    return;
+  }
+  if (action === 'remove') {
+    if (!control.dataset.armed) {
+      control.dataset.armed = 'true';
+      control.textContent = tr('confirmRemove');
+      return;
+    }
+    control.disabled = true;
+    try {
+      const result = await api(control.dataset.endpoint, 'DELETE');
+      if ('user' in result) user = result.user;
+      flash = control.dataset.endpoint === 'account' ? 'accountRemoved' : 'removed';
+      if (control.dataset.after === 'reload') await render({ keepScroll: true });
+      else routeTo(control.dataset.after);
+    } catch (error) {
+      control.disabled = false;
+      control.insertAdjacentHTML('afterend', notice(errorMessage(error), true));
     }
     return;
   }

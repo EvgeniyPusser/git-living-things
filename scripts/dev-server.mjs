@@ -282,6 +282,32 @@ function savePassport(input, user, existing) {
   }
   return id;
 }
+function transaction(work) {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    work();
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+}
+// Relations live inside the passport data, so links from other passports to a deleted one are
+// left in place and filtered out on read (filteredRelations skips targets that no longer exist).
+function removePassport(id) {
+  run('DELETE FROM comments WHERE passport=?', id);
+  run('DELETE FROM files WHERE passport=?', id);
+  run('DELETE FROM versions WHERE passport=?', id);
+  run('DELETE FROM passports WHERE id=?', id);
+}
+function removeAccount(user) {
+  transaction(() => {
+    for (const { id } of all('SELECT id FROM passports WHERE owner=?', user.id)) removePassport(id);
+    run('DELETE FROM comments WHERE author=?', user.id);
+    run('DELETE FROM sessions WHERE account=?', user.id);
+    run('DELETE FROM accounts WHERE id=?', user.id);
+  });
+}
 function detail(row, user) {
   const passport = flatten(row, user);
   passport.relations = filteredRelations(passport, user);
@@ -297,7 +323,8 @@ function detail(row, user) {
     related: [...outgoing, ...incoming],
     files: all("SELECT f.id,f.name,length(f.content) AS size,coalesce(m.category,'other') AS category,m.revision,m.preview " +
       'FROM files f LEFT JOIN attachment_metadata m ON m.file=f.id WHERE f.passport=? ORDER BY f.rowid', row.id),
-    comments: all('SELECT c.created,c.message,a.name FROM comments c JOIN accounts a ON c.author=a.id WHERE c.passport=? ORDER BY c.rowid', row.id),
+    comments: all('SELECT c.id,c.author,c.created,c.message,a.name FROM comments c JOIN accounts a ON c.author=a.id WHERE c.passport=? ORDER BY c.rowid', row.id)
+      .map(({ author, ...comment }) => ({ ...comment, deletable: !!user && (author === user.id || passport.editable) })),
     versions: all('SELECT version,updated,visibility,status,data FROM versions WHERE passport=? ORDER BY version DESC', row.id)
       .filter(item => passport.editable || publicRecord(item))
       .map(item => ({ version: item.version, updated: item.updated, changes: JSON.parse(item.data).changes }))
@@ -332,10 +359,11 @@ async function api(req, res, url) {
   const mime = req.headers['content-type']?.split(';')[0];
   const binary = method === 'POST' && mime === 'application/octet-stream' && fileUploadPath.test(path);
   if (method !== 'GET') {
-    requireValue(['POST', 'PUT'].includes(method), 405, 'invalid');
+    requireValue(['POST', 'PUT', 'DELETE'].includes(method), 405, 'invalid');
     const expected = origin || ('http://' + req.headers.host);
     requireValue(!req.headers.origin || req.headers.origin === expected, 403, 'forbidden');
-    requireValue(mime === 'application/json' || binary, 415, 'invalid');
+    // DELETE carries no body; it is not a CORS-simple method, so it still needs a preflight.
+    requireValue(method === 'DELETE' || mime === 'application/json' || binary, 415, 'invalid');
   }
   if (method === 'POST' && ['/api/register', '/api/login'].includes(path)) return authenticate(req, res, path);
   const user = session(req);
@@ -349,6 +377,11 @@ async function api(req, res, url) {
   if (method === 'GET' && path === '/api/research') return json(res, research.available(req));
   if (method === 'GET' && path === '/api/passports') return json(res, catalog(searchParams, user));
   if (method !== 'GET') requireValue(user, 401, 'signIn');
+  if (method === 'DELETE' && path === '/api/account') {
+    removeAccount(user);
+    res.setHeader('Set-Cookie', 'lt_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0' + secure);
+    return json(res, { user: null });
+  }
   if (method === 'POST' && path === '/api/passports') {
     return json(res, { id: savePassport(await body(req), user) }, 201);
   }
@@ -386,7 +419,22 @@ async function api(req, res, url) {
     run('INSERT INTO comments VALUES (?,?,?,?,?)', randomUUID(), id, user.id, now(), message);
     return json(res, { saved: true }, 201);
   }
+  if (method === 'DELETE' && section === 'comments' && itemId) {
+    const comment = get('SELECT author FROM comments WHERE id=? AND passport=?', itemId, id);
+    requireValue(comment, 404, 'missing');
+    requireValue(comment.author === user.id || row.owner === user.id, 403, 'forbidden');
+    run('DELETE FROM comments WHERE id=?', itemId);
+    return json(res, { deleted: true });
+  }
   requireOwner(row, user);
+  if (method === 'DELETE' && !section) {
+    transaction(() => removePassport(id));
+    return json(res, { deleted: true });
+  }
+  if (method === 'DELETE' && section === 'files' && itemId) {
+    requireValue(run('DELETE FROM files WHERE id=? AND passport=?', itemId, id).changes, 404, 'missing');
+    return json(res, { deleted: true });
+  }
   if (method === 'PUT' && !section) return json(res, { id: savePassport(await body(req), user, row) });
   if (method === 'POST' && section === 'files' && !itemId) {
     return saveAttachment(req, res, searchParams, id, user, binary);

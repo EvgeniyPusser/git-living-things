@@ -83,7 +83,7 @@ async function loadPassport(id, version) {
     client.from('lt_passports').select('*').eq('id', id).single(),
     client.from('lt_relations').select('*').or('source.eq.' + id + ',target.eq.' + id),
     client.from('lt_versions').select('version,updated,changes:data->>changes').eq('passport', id).order('version', { ascending: false }),
-    client.from('lt_comments').select('name,message,created').eq('passport', id).order('created'),
+    client.from('lt_comments').select('id,author,name,message,created').eq('passport', id).order('created'),
     client.from('lt_files').select('id,name,category,revision,preview,size').eq('passport', id).eq('ready', true).order('created')
   ])).map(unwrap);
   const current = passport(row, user?.id);
@@ -100,7 +100,36 @@ async function loadPassport(id, version) {
     const preview = await bucket.createSignedUrl(id + '/' + cover.id, 60);
     cover.previewURL = preview.data?.signedUrl;
   }
-  return { passport: current, related, versions, comments, files };
+  const visibleComments = comments.map(({ author, ...comment }) =>
+    ({ ...comment, deletable: !!user && (author === user.id || current.editable) }));
+  return { passport: current, related, versions, comments: visibleComments, files };
+}
+
+// Storage objects can only be removed through the Storage API, so remove them before the rows.
+async function removeObjects(passportIds) {
+  if (!passportIds.length) return;
+  const files = unwrap(await client.from('lt_files').select('id,passport').in('passport', passportIds));
+  const paths = files.map(file => file.passport + '/' + file.id);
+  for (let start = 0; start < paths.length; start += 100) unwrap(await bucket.remove(paths.slice(start, start + 100)));
+}
+
+async function deletePassport(id) {
+  await removeObjects([id]);
+  unwrap(await client.rpc('lt_delete_passport', { passport_id: id }));
+}
+
+async function deleteFile(passportId, fileId) {
+  unwrap(await bucket.remove([passportId + '/' + fileId]));
+  unwrap(await client.rpc('lt_delete_file', { passport_id: passportId, file_id: fileId }));
+}
+
+async function deleteAccount() {
+  const user = await account();
+  if (!user) throw new Error('signIn');
+  const owned = unwrap(await client.from('lt_passports').select('id').eq('owner', user.id));
+  await removeObjects(owned.map(row => row.id));
+  unwrap(await client.rpc('lt_delete_account'));
+  await client.auth.signOut({ scope: 'local' });
 }
 
 async function savePassport(values) {
@@ -162,7 +191,18 @@ export async function cloudApi(path, method = 'GET', values, signal) {
     unwrap(await client.auth.signOut({ scope: 'local' }));
     return { user: null };
   }
+  if (resource === 'account' && method === 'DELETE') {
+    await deleteAccount();
+    return { user: null };
+  }
   if (resource !== 'passports' || (id && !uuid.test(id))) throw new Error('missing');
+  if (method === 'DELETE') {
+    if (!section) await deletePassport(id);
+    else if (section === 'files' && uuid.test(version || '')) await deleteFile(id, version);
+    else if (section === 'comments' && uuid.test(version || '')) unwrap(await client.from('lt_comments').delete().eq('id', version));
+    else throw new Error('missing');
+    return { deleted: true };
+  }
   if (section === 'comments' && method === 'POST') {
     unwrap(await client.from('lt_comments').insert({ passport: id, message: clean(values.message) }));
     return { saved: true };
