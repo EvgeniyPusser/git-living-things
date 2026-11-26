@@ -103,15 +103,16 @@ function frame(route) {
     '<a class="brand" href="#/"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Living Things</a>' +
     '<nav class="primary-nav" aria-label="' + tr('portal') + '"><a href="#/"' + current('') + '>' + tr('home') +
     '</a><a href="#/guide"' + current('guide') + '>' + tr('guide') + '</a><a href="#/catalog"' + current('catalog') + '>' + tr('catalog') +
-    '</a><a href="#/tests"' + current('tests') + '>' + tr('testRegistry') + '</a></nav>' +
+    '</a><a href="#/tests"' + current('tests') + '>' + tr('testRegistry') + '</a><a href="#/about"' + current('about') + '>' +
+    tr('aboutTitle') + '</a></nav>' +
     '<nav class="nav-end" aria-label="' + tr('accountSettings') + '">' +
     (user ? '<a class="account-name" href="#/account"' + current('account') + '>' + text(user.name) + '</a><button type="button" data-action="logout">' + tr('signOut') + '</button>'
       : '<a href="#/login"' + current('login') + '>' + tr('signIn') + '</a>') +
     '<button type="button" lang="' + (language ? 'ru' : 'en') + '" data-action="language">' +
     (language ? 'Русский' : 'English') + '</button><button type="button" data-action="theme">' +
     tr(dark ? 'lightTheme' : 'darkTheme') + '</button></nav></div></header>';
-  footer.innerHTML = '<footer class="foot"><div class="wrap"><span>Living Things · ' + tr('portal') + '</span><a href="#/guide">' + tr('guide') + '</a><a href="#/rules">' + tr('rulesTitle') +
-    '</a></div></footer>';
+  footer.innerHTML = '<footer class="foot"><div class="wrap"><span>Living Things · ' + tr('portal') + '</span><a href="#/about">' + tr('aboutTitle') + '</a><a href="#/guide">' + tr('guide') +
+    '</a><a href="#/rules">' + tr('rulesTitle') + '</a></div></footer>';
 }
 const homeExamples = ['house', 'transport', 'factory', 'ship', 'aviation', 'grid',
   'facade', 'buildings', 'infrastructure', 'robotics', 'other'];
@@ -505,6 +506,16 @@ function accountView() {
     panel('removeAccount', '<p class="muted">' + tr('removeAccountHelp') + '</p><div>' +
       removeButton('account', '#/', 'removeAccount') + '</div>'));
 }
+function aboutView() {
+  const links = [['ORCID 0009-0004-7834-1486', 'https://orcid.org/0009-0004-7834-1486'], ['GitHub', 'https://github.com/EvgeniyPusser'],
+    ['Zenodo', 'https://zenodo.org/records/23012010'], ['evgenii@living-things.org', 'mailto:evgenii@living-things.org']];
+  return layout(crumbs(tr('aboutTitle')) + '<section class="panel stack"><div class="tight"><h1>' + tr('aboutTitle') + '</h1><p>' +
+    tr('aboutLead') + '</p></div><div class="tight"><h2>' + tr('aboutAimTitle') + '</h2><p>' + tr('aboutAimText') + '</p></div>' +
+    '<div class="tight"><h2>' + tr('aboutWhoTitle') + '</h2><p>' + tr('aboutWhoText') + '</p><ul class="compact-list">' +
+    links.map(([label, url]) => '<li>' + safeLink(url, label) + '</li>').join('') + '</ul></div>' +
+    '<div class="tight"><h2>' + tr('aboutJoinTitle') + '</h2><p>' + tr('aboutJoinText') + '</p></div><div class="actions">' +
+    button('registerSubmit', '#/register') + button('rulesTitle', '#/rules', true) + '</div></section>');
+}
 function rulesView() {
   const sections = [['rulesOwnTitle', 'rulesOwnText'], ['rulesSeeTitle', 'rulesSeeText'], ['rulesRemoveTitle', 'rulesRemoveText'],
     ['rulesDutyTitle', 'rulesDutyText'], ['rulesContactTitle', 'rulesContactText']];
@@ -671,6 +682,7 @@ async function render({ focus = false, keepScroll = false } = {}) {
       case 'register': result = authPage(route, params); break;
       case 'account': result = accountView(); break;
       case 'rules': result = rulesView(); break;
+      case 'about': result = aboutView(); break;
       default: throw new Error('missing');
     }
   } catch (error) {
