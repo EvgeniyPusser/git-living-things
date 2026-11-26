@@ -450,7 +450,8 @@ const staticFiles = {
   '/scripts/open-local.js': ['scripts/open-local.js', 'text/javascript'],
   '/house-model/': ['house-model/index.html', 'text/html'], '/house-model/index.html': ['house-model/index.html', 'text/html'],
   '/house-model/style.css': ['house-model/style.css', 'text/css'],
-  ...Object.fromEntries(['app', 'bridge', 'check', 'graph', 'i18n', 'suggest', 'view'].map(name =>
+  '/house-model/vendor/three.min.js': ['house-model/vendor/three.min.js', 'text/javascript'],
+  ...Object.fromEntries(['app', 'bridge', 'check', 'graph', 'house3d', 'i18n', 'suggest', 'view', 'view3d'].map(name =>
     ['/house-model/' + name + '.js', ['house-model/' + name + '.js', 'text/javascript']])),
   '/taxonomy.js': ['taxonomy.js', 'text/javascript'], '/locale.js': ['locale.js', 'text/javascript'],
   '/buildings/urban-graph.html': ['buildings/urban-graph.html', 'text/html'],

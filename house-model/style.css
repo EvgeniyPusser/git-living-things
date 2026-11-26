@@ -31,6 +31,10 @@ svg text { font: 12px system-ui, sans-serif; fill: var(--ink); paint-order: stro
 svg text.head { fill: var(--mut); }
 svg text.in { fill: #fff; stroke: none; font-weight: 600; }
 .node { cursor: grab; }
+.three { position: absolute; inset: 0; }
+.three canvas { display: block; cursor: grab; touch-action: none; }
+.modes { display: flex; gap: 4px; margin-bottom: 6px; }
+.modes button[aria-pressed=true] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .legend { display: flex; gap: 14px; font-size: 12px; color: var(--mut); margin: 6px 0 12px; }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; }
 i.green { background: var(--ok); } i.yellow { background: var(--part); } i.red { background: var(--bad); }

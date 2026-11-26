@@ -6,6 +6,7 @@ import { suggestions, label, nodeText } from './suggest.js';
 import { tr, getLang, setLang, getTheme, setTheme } from './i18n.js';
 import * as bridge from './bridge.js';
 import { render as draw } from './view.js';
+import { createView3d } from './view3d.js';
 
 const STEPS = [
   { types: ['foundation', 'wall', 'column', 'beam', 'slab', 'roof', 'window', 'door', 'stair', 'site', 'building', 'storey', 'space'], links: ['supports', 'adjacent', 'contains'] },
@@ -17,7 +18,8 @@ const STEPS = [
   { assessment: true }
 ];
 const ACTIONS = ['open-window', 'heating', 'cooling', 'ventilation', 'dehumidifier', 'valve'];
-const state = { model: starterModel(getLang()), step: 0, selected: null, positions: {}, message: '', armed: false };
+const state = { model: starterModel(getLang()), step: 0, selected: null, positions: {}, message: '', armed: false, mode: 'graph' };
+let view3d = null;
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const lang = () => getLang();
@@ -142,10 +144,18 @@ function render() {
 }
 
 function redraw() {
-  draw($('svg'), state.model, assessModel(state.model), {
-    selected: state.selected, positions: state.positions,
-    onSelect: id => { state.selected = id; render(); }
-  });
+  const solid = state.mode === '3d';
+  $('modes').innerHTML = ['graph', '3d'].map(mode => '<button data-mode="' + mode + '" aria-pressed="' + (state.mode === mode) + '">' +
+    tr(mode === '3d' ? 'mode3d' : 'modeGraph') + '</button>').join('');
+  $('svg').toggleAttribute('hidden', solid); // SVG elements have no .hidden property
+  $('three').hidden = !solid;
+  $('note3d').hidden = !solid;
+  $('note3d').textContent = tr('note3d');
+  const onSelect = id => { state.selected = id; render(); };
+  if (!solid) return draw($('svg'), state.model, assessModel(state.model), { selected: state.selected, positions: state.positions, onSelect });
+  if (view3d) return view3d.then(view => view.update(state.model, state.selected));
+  view3d = createView3d($('three'), { onSelect });
+  view3d.then(view => view.update(state.model, state.selected), () => { view3d = null; state.mode = 'graph'; message(tr('no3d')); redraw(); });
 }
 
 function change(fn) {
@@ -174,6 +184,8 @@ document.addEventListener('submit', event => {
 });
 
 document.addEventListener('click', event => {
+  const mode = event.target.closest('[data-mode]');
+  if (mode) { state.mode = mode.dataset.mode; return redraw(); }
   const tab = event.target.closest('[data-step]');
   if (tab) return change(() => { state.step = Number(tab.dataset.step); });
   const act = event.target.closest('[data-act]');

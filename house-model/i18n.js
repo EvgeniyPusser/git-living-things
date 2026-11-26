@@ -58,6 +58,10 @@ const STRINGS = {
   portalNoAnswer: ['Портал не ответил, модель паспорта не загрузилась. Обновите страницу.', 'The portal did not answer and the passport model did not load. Reload the page.'],
   loading: ['Загружаю модель паспорта…', 'Loading the passport model…'],
   layers: [['Пространства', 'Тело', 'Нервы', 'Мозг', 'Сети', 'Запасы', 'Органы'], ['Spaces', 'Body', 'Nerves', 'Brain', 'Networks', 'Reserves', 'Organs']],
+  modeGraph: ['Схема', 'Diagram'], mode3d: ['Объём', '3D'],
+  note3d: ['Условный дом: показывает, где в доме стоит каждый узел графа. Размеры не настоящие. Мышью — вращение и масштаб, нажатие выбирает часть.',
+    'A schematic house showing where each node of the graph sits. Sizes are not real. Drag to rotate, scroll to zoom, click to select a part.'],
+  no3d: ['Объёмный вид не загрузился', 'The 3D view did not load'],
   light: ['Светлая', 'Light'], dark: ['Тёмная', 'Dark'],
   fields: [{
     structureProject: 'Каркас, оболочка и конструктивный расчёт', supplyProject: 'Энергоснабжение, сети и ресурсы',
