@@ -31,6 +31,7 @@ let dark = preference('lt-theme') === 'dark';
 let user = null;
 let generation = 0;
 let flash = '';
+let scrollToHouse = false;
 let editorState = null;
 const comparison = new Set();
 
@@ -44,6 +45,10 @@ const title = key => '<h2>' + tr(key) + '</h2>';
 const passportURL = id => '#/passport/' + encodeURIComponent(id);
 const button = (label, href, secondary = false) =>
   '<a class="button' + (secondary ? ' secondary' : '') + '" href="' + attr(href) + '">' + tr(label) + '</a>';
+// The Living House helper opened on its own (no passport): saves to a file on the computer.
+const houseHelperLink = () => '<a class="button secondary" href="' + attr('house-model/?' + new URLSearchParams({ lang: language ? 'en' : 'ru' })) +
+  '" target="_blank" rel="noopener">' + tr('houseHelperOpen') + '</a>';
+const houseHelperCallout = () => panel('houseHelperTitle', '<p class="muted">' + tr('houseHelperText') + '</p><div class="actions">' + houseHelperLink() + '</div>');
 const submit = (label, secondary = false, extra = '') =>
   '<button class="' + (secondary ? 'secondary' : 'primary') + '" type="submit" ' + extra + '>' + tr(label) + '</button>';
 const customButton = (label, action) =>
@@ -158,7 +163,7 @@ function home() {
     '<p class="intro-video-fallback" hidden>' + safeLink('./assets/intro/living-things-' + videoLanguage + '.mp4', tr('openIntroFile')) + '</p></figure>';
   return layout('<section class="hero home-hero"><div class="tight"><p class="eyebrow">' + tr('portal') + '</p><h1>Living Things</h1><p>' +
     tr('tagline') + '</p></div>' + introVideo +
-    '</section>' + contributeSteps() + exampleGallery(homeExamples, 'home-examples') + globalSearch() + '<section class="panel intro"><h2>' + tr('intro') + '</h2>' +
+    '</section>' + contributeSteps() + houseHelperCallout() + exampleGallery(homeExamples, 'home-examples') + globalSearch() + '<section class="panel intro"><h2>' + tr('intro') + '</h2>' +
     [['meaning', 'meaningBrief'], ['scope', 'scopeText'], ['passportPurpose', 'passportText'], ['findTitle', 'findText']].map(([heading, paragraph]) =>
       '<div class="tight"><h3>' + tr(heading) + '</h3><p class="muted">' + tr(paragraph) + '</p></div>').join('') +
     '<div class="actions">' + button('openGuide', '#/guide', true) + '</div></section>');
@@ -260,7 +265,7 @@ async function guide(params) {
     ['passportPurpose', ['passportText', 'evidenceText']], ['related', ['relationText']], ['findTitle', ['findText']]
   ];
   return layout(crumbs(tr('guide')) + '<div class="tight"><h1>' + tr('guideHeading') + '</h1><p class="muted">' + tr('guideIntro') + '</p></div>' +
-    chooser + sampleView + (key === 'house' ? houseProjectSample() : '') + territoryContext(key === 'grid' ? 'neighbourhood' : key) +
+    chooser + (['house', 'buildings'].includes(key) ? houseHelperCallout() : '') + sampleView + (key === 'house' ? houseProjectSample() : '') + territoryContext(key === 'grid' ? 'neighbourhood' : key) +
     panel('guideSteps', '<ol class="guide-steps">' + steps + '</ol>') + sourceList +
     panel('guideFilesMissing', paragraph(route.missing ? words(route.missing) : tr('guideDataNote'))) +
     researchLinks(foundationalResearch, available, 'researchBackground') +
@@ -496,7 +501,7 @@ async function passportView(id, version) {
   houseContext = { id, editable: passport.editable };
   const houseModel = hasModel || (passport.editable && passport.domains.includes('buildings')) ?
     panel('houseModel', '<p class="muted">' + tr(passport.editable ? 'houseModelHelp' : 'houseModelReadonly') + '</p>' +
-      '<div class="house-model">' + customButton('openHouseModel', 'open-house-model') + '</div>') : '';
+      '<div class="house-model">' + customButton('openHouseModel', 'open-house-model') + '</div>', 'house-model') : '';
   const removal = passport.editable ? panel('removeZone', '<p class="muted">' + tr('removePassportHelp') + '</p><div>' +
     removeButton(endpoint, '#/catalog', 'removePassport') + '</div>') : '';
   const discuss = user ? '<form class="tight" data-form="comment" data-id="' + attr(id) + '">' +
@@ -634,7 +639,8 @@ function editSections(passport, candidates) {
       '<fieldset class="tight" data-domain-fields="' + key + '"' + (chosen.includes(key) ? '' : ' hidden disabled') + '><legend>' + domain.label[language] +
       '</legend><div class="grid-2">' + Object.keys(domain.fields).filter(field => !Object.hasOwn(houseProjectFields, field)).map(field =>
         area('detail.' + key + '.' + field, name(domain.fields, field), passport.details?.[key]?.[field])).join('') + '</div>' +
-      (key === 'buildings' ? houseProjectEditor(passport.details?.buildings) : '') + '</fieldset>').join('')) +
+      (key === 'buildings' ? '<div class="notice house-helper-note"><p>' + tr('houseHelperEditor') + '</p>' + houseHelperLink() + '</div>' +
+        houseProjectEditor(passport.details?.buildings) : '') + '</fieldset>').join('')) +
     panel('origins', '<div class="grid-2">' + [...originKeys, 'changes'].map(key => passportArea(passport, key)).join('') + '</div>') +
     panel('related', '<div id="relation-list" class="tight">' + (passport.relations || []).map(item => relationEditor(item, candidates)).join('') +
       '</div>' + (candidates.length ? '<div>' + customButton('addRelation', 'add-relation') + '</div>' :
@@ -786,6 +792,10 @@ async function render({ focus = false, keepScroll = false } = {}) {
     main.focus({ preventScroll: true });
     window.scrollTo(0, 0);
   } else if (keepScroll) window.scrollTo(0, previousScroll);
+  if (scrollToHouse && route === 'passport') {
+    scrollToHouse = false;
+    main.querySelector('#house-model')?.scrollIntoView({ block: 'start' });
+  }
 }
 function routeTo(href) {
   if (location.hash === href) {
@@ -864,8 +874,11 @@ document.addEventListener('submit', event => {
   if (kind === 'passport') {
     const status = event.submitter?.value || 'draft';
     transact(form, async () => {
-      const result = await api(id ? 'passports/' + encodeURIComponent(id) : 'passports', id ? 'PUT' : 'POST', editorData(form, status));
+      const values = editorData(form, status);
+      const result = await api(id ? 'passports/' + encodeURIComponent(id) : 'passports', id ? 'PUT' : 'POST', values);
       flash = 'saved';
+      // A new house lands on the helper panel, so its author sees the helper right away.
+      scrollToHouse = !id && values.domains.includes('buildings');
       routeTo(passportURL(result.id));
     });
   }
