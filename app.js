@@ -2,7 +2,7 @@ import { strings } from './locale.js';
 import { domains, levels, types, properties, evidence, stages, relations, passportFields, claimFields, architectureFields,
   attachmentCategories, attachmentLimits, houseProjectFields, houseProjectGroups } from './taxonomy.js';
 import { domainResearch, foundationalResearch, territoryInterfaces, testRegistry, urbanPrototype } from './research.js';
-import { concreteStudy, examples, exampleDomain, exampleImagePath, guideCases, houseProjectExample } from './examples.js';
+import { concreteStudy, examples, exampleDomain, exampleImagePath, exampleThumbPath, guideCases, houseProjectExample } from './examples.js';
 import { validateModel } from './house-model/graph.js';
 import { suggestions, applySuggestion } from './house-model/suggest.js';
 
@@ -138,6 +138,15 @@ function exampleCards(keys) {
       text(example.summary[language]) + '</p></div></article>';
   }).join('') + '</div>';
 }
+// Home page: small thumbnails with titles only. The large pictures and summaries stay in the catalog.
+function exampleStrip(keys) {
+  return '<section class="tight" aria-labelledby="examples-heading"><h2 id="examples-heading">' + tr('exampleGallery') +
+    '</h2><ul class="example-strip">' + keys.map(key => {
+      const example = examples[key];
+      return '<li><a href="#/example/' + attr(key) + '"><img loading="lazy" width="400" height="225" src="./' +
+        attr(exampleThumbPath(example)) + '" alt=""><span>' + text(example.title[language]) + '</span></a></li>';
+    }).join('') + '</ul></section>';
+}
 function exampleGallery(keys, className = '') {
   return '<section class="tight' + (className ? ' ' + className : '') + '" aria-labelledby="examples-heading"><h2 id="examples-heading">' +
     tr('exampleGallery') + '</h2>' + exampleCards(keys) + '</section>';
@@ -161,7 +170,7 @@ function home() {
   return layout('<section class="hero home-hero"><div class="tight"><p class="eyebrow">' + tr('portal') + '</p><h1>Living Things</h1><p>' +
     tr('tagline') + '</p><p>' + tr('heroRegistry') + '</p><div class="actions">' + button('browseRegistry', '#/catalog') +
     button('addWork', createURL(), true) + '</div></div>' + introVideo +
-    '</section>' + whyRegistry() + exampleGallery(homeExamples, 'home-examples') + globalSearch() + houseHelperCallout());
+    '</section>' + whyRegistry() + exampleStrip(homeExamples) + globalSearch() + houseHelperCallout());
 }
 async function localResearch() {
   try {

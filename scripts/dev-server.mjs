@@ -10,7 +10,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { domains, levels, types, properties, evidence, stages, relations, passportFields, claimFields, architectureFields,
   attachmentCategories, attachmentLimits } from '../taxonomy.js';
 import { researchFiles } from './research-files.mjs';
-import { examples, exampleImagePath } from '../examples.js';
+import { examples, exampleImagePath, exampleThumbPath } from '../examples.js';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const research = researchFiles(root);
@@ -464,9 +464,10 @@ const staticFiles = {
   '/assets/intro/living-things-en.mp4': ['assets/intro/living-things-en.mp4', 'video/mp4'],
   '/assets/intro/living-things-ru.vtt': ['assets/intro/living-things-ru.vtt', 'text/vtt'],
   '/assets/intro/living-things-en.vtt': ['assets/intro/living-things-en.vtt', 'text/vtt'],
-  ...Object.fromEntries(Object.values(examples).map(example => {
+  ...Object.fromEntries(Object.values(examples).flatMap(example => {
     const path = exampleImagePath(example);
-    return ['/' + path, [path, 'image/' + path.split('.').pop()]];
+    const thumb = exampleThumbPath(example);
+    return [['/' + path, [path, 'image/' + path.split('.').pop()]], ['/' + thumb, [thumb, 'image/jpeg']]];
   }))
 };
 async function serveVideo(req, res, file) {

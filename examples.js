@@ -268,6 +268,10 @@ export const exampleDomain = key => examples[key].domain || key;
 export function exampleImagePath({ image }) {
   return image.includes('/') ? 'assets/' + image : 'assets/examples/' + image;
 }
+// Small 400×225 JPEG copy of the example image, made for the home page.
+export function exampleThumbPath({ image }) {
+  return 'assets/thumbs/' + image.split('/').pop().replace(/\.\w+$/, '.jpg');
+}
 
 export const guideCases = {
   buildings: {
