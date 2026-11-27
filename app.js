@@ -26,7 +26,9 @@ function preference(key, value) {
     // The portal also works when the browser blocks local storage.
   }
 }
-let language = preference('lt-language') === 'en' ? 1 : 0;
+const savedLanguage = preference('lt-language');
+let language = savedLanguage ? (savedLanguage === 'en' ? 1 : 0)
+  : (navigator.language || '').startsWith('ru') ? 0 : 1;
 let dark = preference('lt-theme') === 'dark';
 let user = null;
 let generation = 0;
