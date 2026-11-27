@@ -460,6 +460,8 @@ const staticFiles = {
   '/buildings/urban-model.js': ['buildings/urban-model.js', 'text/javascript'],
   '/buildings/urban-graph.js': ['buildings/urban-graph.js', 'text/javascript'],
   '/assets/intro/poster.jpg': ['assets/intro/poster.jpg', 'image/jpeg'],
+  '/assets/figures/living-building-stages.jpg': ['assets/figures/living-building-stages.jpg', 'image/jpeg'],
+  '/assets/figures/living-thing-architecture.png': ['assets/figures/living-thing-architecture.png', 'image/png'],
   '/assets/intro/living-things-ru.mp4': ['assets/intro/living-things-ru.mp4', 'video/mp4'],
   '/assets/intro/living-things-en.mp4': ['assets/intro/living-things-en.mp4', 'video/mp4'],
   '/assets/intro/living-things-ru.vtt': ['assets/intro/living-things-ru.vtt', 'text/vtt'],

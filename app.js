@@ -138,6 +138,8 @@ function exampleCards(keys) {
       text(example.summary[language]) + '</p></div></article>';
   }).join('') + '</div>';
 }
+const figure = (src, width, height, alt, caption) => '<figure class="page-figure"><img src="./' + attr(src) + '" width="' + width +
+  '" height="' + height + '" alt="' + attr(tr(alt)) + '"><figcaption>' + tr(caption) + '</figcaption></figure>';
 // Home page: small thumbnails with titles only. The large pictures and summaries stay in the catalog.
 function exampleStrip(keys) {
   return '<section class="tight" aria-labelledby="examples-heading"><h2 id="examples-heading">' + tr('exampleGallery') +
@@ -170,7 +172,8 @@ function home() {
   return layout('<section class="hero home-hero"><div class="tight"><p class="eyebrow">' + tr('portal') + '</p><h1>Living Things</h1><p>' +
     tr('tagline') + '</p><p>' + tr('heroRegistry') + '</p><div class="actions">' + button('browseRegistry', '#/catalog') +
     button('addWork', createURL(), true) + '</div></div>' + introVideo +
-    '</section>' + whyRegistry() + exampleStrip(homeExamples) + globalSearch() + houseHelperCallout());
+    '</section>' + figure('assets/figures/living-building-stages.jpg', 1600, 634, 'stagesAlt', 'stagesCaption') +
+    whyRegistry() + exampleStrip(homeExamples) + globalSearch() + houseHelperCallout());
 }
 async function localResearch() {
   try {
@@ -580,11 +583,12 @@ function aboutView() {
   const links = [['ORCID 0009-0004-7834-1486', 'https://orcid.org/0009-0004-7834-1486'], ['GitHub', 'https://github.com/EvgeniyPusser'],
     ['Zenodo', 'https://zenodo.org/records/23012010'], ['evgenii@living-things.org', 'mailto:evgenii@living-things.org']];
   return layout(crumbs(tr('aboutTitle')) + '<section class="panel stack"><div class="tight"><h1>' + tr('aboutTitle') + '</h1><p>' +
-    tr('aboutLead') + '</p></div><div class="tight"><h2>' + tr('aboutAimTitle') + '</h2><p>' + tr('aboutAimText') + '</p></div>' +
+    tr('aboutLead') + '</p></div>' + figure('assets/figures/living-thing-architecture.png', 1800, 1152, 'architectureAlt', 'architectureCaption') +
+    '<div class="tight"><h2>' + tr('aboutAimTitle') + '</h2><p>' + tr('aboutAimText') + '</p></div>' +
     '<div class="tight"><h2>' + tr('aboutWhoTitle') + '</h2><p>' + tr('aboutWhoText') + '</p><ul class="compact-list">' +
     links.map(([label, url]) => '<li>' + safeLink(url, label) + '</li>').join('') + '</ul></div>' +
     '<div class="tight"><h2>' + tr('aboutJoinTitle') + '</h2><p>' + tr('aboutJoinText') + '</p></div><div class="actions">' +
-    button('registerSubmit', '#/register') + button('rulesTitle', '#/rules', true) + '</div></section>');
+    button('addWork', createURL()) + button('rulesTitle', '#/rules', true) + '</div></section>');
 }
 function rulesView() {
   const sections = [['rulesOwnTitle', 'rulesOwnText'], ['rulesSeeTitle', 'rulesSeeText'], ['rulesRemoveTitle', 'rulesRemoveText'],
