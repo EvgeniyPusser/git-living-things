@@ -142,15 +142,12 @@ function exampleGallery(keys, className = '') {
   return '<section class="tight' + (className ? ' ' + className : '') + '" aria-labelledby="examples-heading"><h2 id="examples-heading">' +
     tr('exampleGallery') + '</h2>' + exampleCards(keys) + '</section>';
 }
-// First thing invited researchers see: how to put their own work into the registry.
-function contributeSteps() {
-  const steps = [['contributeAccount', 'contributeAccountText'], ['contributeDraft', 'contributeDraftText'],
-    ['contributePublish', 'contributePublishText']];
-  return '<section class="panel contribute" aria-labelledby="contribute-heading"><div class="tight"><h2 id="contribute-heading">' +
-    tr('contributeTitle') + '</h2><p class="muted">' + tr('contributeLead') + '</p></div><ol class="contribute-steps">' +
-    steps.map(([heading, paragraph]) => '<li><h3>' + tr(heading) + '</h3><p class="muted">' + tr(paragraph) + '</p></li>').join('') +
-    '</ol><div class="actions">' + (user ? button('create', createURL()) : button('registerSubmit', '#/register')) +
-    button('openGuide', '#/guide', true) + '<a href="#/rules">' + tr('rulesTitle') + '</a></div></section>';
+// Why a researcher would use the registry. No sign-up here: the account is asked for only when saving (openEditor).
+function whyRegistry() {
+  const points = [['whyFormat', 'whyFormatText'], ['whyEvidence', 'whyEvidenceText'], ['whyCompare', 'whyCompareText']];
+  return '<section class="panel why" aria-labelledby="why-heading"><h2 id="why-heading">' + tr('whyTitle') + '</h2><ul class="why-points">' +
+    points.map(([heading, paragraph]) => '<li><h3>' + tr(heading) + '</h3><p class="muted">' + tr(paragraph) + '</p></li>').join('') +
+    '</ul><p class="muted">' + tr('openNote') + ' <a href="#/about">' + tr('aboutTitle') + '</a></p></section>';
 }
 function home() {
   const videoLanguage = language ? 'en' : 'ru';
@@ -162,11 +159,9 @@ function home() {
     '<button class="intro-video-play" type="button" data-action="play-intro">' + tr('playIntro') + '</button></div>' +
     '<p class="intro-video-fallback" hidden>' + safeLink('./assets/intro/living-things-' + videoLanguage + '.mp4', tr('openIntroFile')) + '</p></figure>';
   return layout('<section class="hero home-hero"><div class="tight"><p class="eyebrow">' + tr('portal') + '</p><h1>Living Things</h1><p>' +
-    tr('tagline') + '</p></div>' + introVideo +
-    '</section>' + contributeSteps() + houseHelperCallout() + exampleGallery(homeExamples, 'home-examples') + globalSearch() + '<section class="panel intro"><h2>' + tr('intro') + '</h2>' +
-    [['meaning', 'meaningBrief'], ['scope', 'scopeText'], ['passportPurpose', 'passportText'], ['findTitle', 'findText']].map(([heading, paragraph]) =>
-      '<div class="tight"><h3>' + tr(heading) + '</h3><p class="muted">' + tr(paragraph) + '</p></div>').join('') +
-    '<div class="actions">' + button('openGuide', '#/guide', true) + '</div></section>');
+    tr('tagline') + '</p><p>' + tr('heroRegistry') + '</p><div class="actions">' + button('browseRegistry', '#/catalog') +
+    button('addWork', createURL(), true) + '</div></div>' + introVideo +
+    '</section>' + whyRegistry() + exampleGallery(homeExamples, 'home-examples') + globalSearch() + houseHelperCallout());
 }
 async function localResearch() {
   try {

@@ -99,13 +99,9 @@ main { min-height: calc(100vh - 10rem); padding-block: 2.35rem 3.5rem; }
 .search-bar input { flex: 1; }
 .panel { background: var(--paper); border: 1px solid var(--line); border-radius: .65rem; padding: clamp(1rem, 3vw, 1.6rem); min-width: 0; }
 .house-frame { display: block; width: 100%; height: min(90vh, 900px); border: 1px solid var(--line); border-radius: .45rem; background: var(--paper); }
-.contribute { display: grid; gap: 1rem; }
-.contribute-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem 2rem; margin: 0; padding: 0;
-  list-style: none; counter-reset: step; }
-.contribute-steps li { counter-increment: step; display: grid; grid-template-columns: 2rem 1fr; column-gap: .75rem; align-items: start; align-content: start; }
-.contribute-steps li::before { content: counter(step); grid-row: span 2; display: grid; place-items: center; width: 2rem; height: 2rem;
-  border-radius: 50%; background: var(--navy); color: #fff; font-weight: 700; }
-.contribute-steps h3, .contribute-steps p { margin: 0; }
+.why { display: grid; gap: 1rem; }
+.why-points { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem 2rem; margin: 0; padding: 0; list-style: none; }
+.why-points h3, .why-points p { margin: 0 0 .35rem; }
 .intro { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 1rem 2.5rem; }
 .intro h2, .intro .actions { grid-column: 1 / -1; }
 .intro p, .guide p { max-width: 78ch; }
